@@ -1,0 +1,2 @@
+export { RaceDetailPage } from './RaceDetailPage'
+
