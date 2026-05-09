@@ -285,11 +285,12 @@ export function ProfilePage() {
                       </Link>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap gap-5">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                       {favouriteRaces.map((race) => (
-                        <div key={race.id} className="relative shrink-0">
+                        <div key={race.id} className="relative">
                           <RaceCard
                             mode="local"
+                            layout="grid"
                             compactListing
                             sportKey={sportKeyFromLabel(race.raceType)}
                             title={race.title}
@@ -307,7 +308,7 @@ export function ProfilePage() {
                           <button
                             type="button"
                             aria-label={`Remove ${race.title} from favourites`}
-                            className="absolute bottom-14 right-3 z-20 flex size-9 items-center justify-center rounded-full border border-white/15 bg-black/75 text-white/90 shadow-lg backdrop-blur-md transition hover:border-red-400/45 hover:bg-red-950/55 hover:text-red-100"
+                            className="absolute top-4 right-4 z-20 flex size-9 items-center justify-center rounded-full border border-red-400/25 bg-red-950/25 text-red-200 shadow-lg backdrop-blur-md transition hover:border-red-400/45 hover:bg-red-950/35"
                             onClick={() => toggle(race.id)}
                           >
                             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden="true">

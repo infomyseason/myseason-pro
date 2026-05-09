@@ -7,6 +7,8 @@ export type RaceCardMode = "local" | "sport" | "featured"
 
 type RaceCardProps = {
   mode: RaceCardMode
+  /** "carousel" keeps fixed card width; "grid" makes the card fluid/full-width. */
+  layout?: "carousel" | "grid"
   sportKey: SportKey
   title: string
   /** e.g. "Berlin, Germany" */
@@ -58,6 +60,7 @@ function HeartIcon({ filled }: { filled: boolean }) {
 
 export function RaceCard({
   mode,
+  layout = "carousel",
   sportKey,
   title,
   locationLine,
@@ -85,11 +88,13 @@ export function RaceCard({
   const restDistances = distances.length > 2 ? distances.length - 2 : 0
 
   const sizeClass =
-    mode === "featured"
-      ? "h-[340px] w-[340px] md:h-[380px] md:w-[400px]"
-      : mode === "local"
-        ? "h-[300px] w-[280px] md:w-[320px]"
-        : "h-[280px] w-[280px] md:w-[300px]"
+    layout === "grid"
+      ? "w-full h-[300px] sm:h-[320px] md:h-[340px]"
+      : mode === "featured"
+        ? "h-[340px] w-[min(100%,340px)] md:h-[380px] md:w-[400px]"
+        : mode === "local"
+          ? "h-[300px] w-[min(100%,280px)] md:w-[320px]"
+          : "h-[280px] w-[min(100%,280px)] md:w-[300px]"
 
   const titleClass =
     mode === "featured"
@@ -98,7 +103,9 @@ export function RaceCard({
         ? "text-xl"
         : "text-lg md:text-xl"
 
-  const shellClassName = `group relative shrink-0 cursor-pointer overflow-hidden rounded-2xl transition-all duration-500 ${sizeClass} hover:scale-[1.03] ${hoverShadow}`
+  const shellClassName = `group relative ${layout === "carousel" ? "shrink-0" : ""} cursor-pointer overflow-hidden rounded-2xl transition-all duration-500 ${sizeClass} ${
+    layout === "carousel" ? "hover:scale-[1.03]" : ""
+  } ${hoverShadow} max-w-full`
   const focusRingClass =
     "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
 

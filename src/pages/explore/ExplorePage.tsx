@@ -506,6 +506,7 @@ export function ExplorePage() {
     <RaceCard
       key={race.id}
       mode="local"
+      layout="grid"
       compactListing
       sportKey={sportKeyFromLabel(race.sport)}
       title={race.title}

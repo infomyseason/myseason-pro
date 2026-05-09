@@ -99,7 +99,7 @@ export function HeroSection() {
   }, [])
 
   return (
-    <section className="relative flex min-h-[90vh] flex-col items-center justify-center overflow-hidden px-4 pb-16 pt-24">
+    <section className="relative flex min-h-[80vh] flex-col items-center justify-center overflow-hidden px-4 pb-14 pt-24 sm:min-h-[90vh] sm:pb-16">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 top-1/4 h-[600px] w-[600px] animate-pulse rounded-full bg-primary/10 blur-[120px]" />
         <div
@@ -162,7 +162,7 @@ export function HeroSection() {
           </span>
         </div>
 
-        <h1 className="mb-6 text-balance text-5xl font-black leading-[1.05] tracking-tight text-foreground md:text-7xl lg:text-8xl">
+        <h1 className="mb-6 text-balance text-4xl font-black leading-[1.08] tracking-tight text-foreground sm:text-5xl md:text-7xl lg:text-8xl">
           Plan your season.{" "}
           <span className="relative">
             <span className="bg-gradient-to-r from-primary via-[#e8c9a0] to-primary bg-clip-text text-transparent">
@@ -172,7 +172,7 @@ export function HeroSection() {
           </span>
         </h1>
 
-        <p className="mx-auto mb-12 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground md:text-xl">
+        <p className="mx-auto mb-10 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg md:mb-12 md:text-xl">
           Discover running, triathlon, cycling and HYROX events from Lisbon to Helsinki — and build a calendar
           that pushes you to your next PR.
         </p>
@@ -209,7 +209,7 @@ export function HeroSection() {
                 placeholder="Search event name, country, or race type…"
                 autoComplete="off"
                 enterKeyHint="search"
-                className="h-16 w-full rounded-2xl border-2 border-border/50 bg-secondary/70 pl-14 pr-6 text-lg text-foreground shadow-lg backdrop-blur-xl placeholder:text-muted-foreground transition-all duration-300 focus:border-primary/50 focus:bg-secondary/90 focus:outline-none focus:ring-[3px] focus:ring-ring/40 md:text-base"
+                className="h-14 w-full rounded-2xl border-2 border-border/50 bg-secondary/70 pl-12 pr-4 text-base text-foreground shadow-lg backdrop-blur-xl placeholder:text-muted-foreground transition-all duration-300 focus:border-primary/50 focus:bg-secondary/90 focus:outline-none focus:ring-[3px] focus:ring-ring/40 sm:h-16 sm:pl-14 sm:pr-6 sm:text-lg md:text-base"
               />
               <div className="absolute right-4 top-1/2 hidden -translate-y-1/2 items-center gap-1.5 rounded-lg bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground md:flex">
                 <span>Press</span>

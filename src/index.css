@@ -46,6 +46,7 @@
 
 body {
   margin: 0;
+  overflow-x: hidden;
   background-color: var(--color-background);
   background-image:
     radial-gradient(900px 600px at 18% 10%, rgba(59, 130, 246, 0.12), transparent 60%),
@@ -66,6 +67,7 @@ body {
 #root {
   min-height: 100svh;
   width: 100%;
+  overflow-x: hidden;
 }
 
 .scrollbar-hide {
