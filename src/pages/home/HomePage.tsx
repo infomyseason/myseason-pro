@@ -22,7 +22,7 @@ export function HomePage() {
       <SeasonPlannerPreview />
       <SportSections />
       <CommunityRaces />
-      <section className="border-t border-border/30 bg-secondary/10 px-4 py-14">
+      <section className="border-t border-border/30 bg-secondary/10 px-4 py-9 md:py-14">
         <div className="mx-auto flex max-w-7xl justify-center">
           <Link
             to="/explore"

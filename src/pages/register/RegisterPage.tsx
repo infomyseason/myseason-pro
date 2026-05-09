@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { useAuth } from "../../auth/useAuth"
 import { AuthPageShell } from "../../components/auth/AuthPageShell"
-import { useMockAuth, validatePasswordRules } from "../../hooks/useMockAuth"
-import { freshProfileForAuthUser, saveProfileForUser } from "../../hooks/usePersistedProfile"
+import { validatePasswordRules } from "../../lib/authValidation"
+import { supabase } from "../../lib/supabase"
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-border/55 bg-background/90 px-4 py-2.5 text-sm text-foreground outline-none ring-primary/15 placeholder:text-muted-foreground/45 focus:border-primary/40 focus:ring-2"
 
 export function RegisterPage() {
   const navigate = useNavigate()
-  const { isLoggedIn, register } = useMockAuth()
+  const { isLoggedIn, loading, signUp } = useAuth()
 
   const [loginName, setLoginName] = useState("")
   const [email, setEmail] = useState("")
@@ -17,14 +18,15 @@ export function RegisterPage() {
   const [displayName, setDisplayName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState(false)
 
   useEffect(() => {
-    if (isLoggedIn) navigate("/profile", { replace: true })
-  }, [isLoggedIn, navigate])
+    if (!loading && isLoggedIn) navigate("/profile", { replace: true })
+  }, [isLoggedIn, loading, navigate])
 
   const pwdHints = validatePasswordRules(password)
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const form = e.currentTarget
     const loginNameEl = form.elements.namedItem("loginName")
@@ -37,26 +39,63 @@ export function RegisterPage() {
     const passwordVal = passwordEl instanceof HTMLInputElement ? passwordEl.value : ""
 
     setError(null)
+    setPendingConfirm(false)
+
+    if (!loginNameVal || !emailVal || !displayNameVal) {
+      setError("Fill in every field.")
+      return
+    }
+
+    const pwdErrors = validatePasswordRules(passwordVal)
+    if (pwdErrors.length > 0) {
+      setError(pwdErrors.join(" "))
+      return
+    }
+
     setSubmitting(true)
-    const res = register({
+
+    const { data: available, error: rpcErr } = await supabase.rpc("login_name_available", {
+      p_login: loginNameVal,
+    })
+
+    if (rpcErr) {
+      setSubmitting(false)
+      setError(rpcErr.message || "Could not validate login name.")
+      return
+    }
+
+    if (available !== true) {
+      setSubmitting(false)
+      setError("Login name already taken.")
+      return
+    }
+
+    const res = await signUp({
       loginName: loginNameVal,
       email: emailVal,
       password: passwordVal,
       displayName: displayNameVal,
     })
+
     setSubmitting(false)
-    if (!res.ok) {
-      setError(res.error)
+
+    if (res.error) {
+      setError(res.error.message)
       return
     }
-    saveProfileForUser(res.user.id, freshProfileForAuthUser(res.user.displayName))
+
+    if (res.needsEmailConfirmation) {
+      setPendingConfirm(true)
+      return
+    }
+
     navigate("/profile", { replace: true })
   }
 
   return (
     <AuthPageShell
       title="Create account"
-      subtitle="Mock registration — data stays in your browser. Login name and email must be unique."
+      subtitle="We’ll send a confirmation link when your project requires verified email (Supabase Auth settings)."
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <label className="block">
@@ -121,6 +160,15 @@ export function RegisterPage() {
           ) : null}
         </label>
 
+        {pendingConfirm ? (
+          <p
+            className="rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-sm text-primary-foreground/95"
+            role="status"
+          >
+            Check your inbox and confirm your email, then sign in. You can close this tab after you’ve clicked the link.
+          </p>
+        ) : null}
+
         {error ? (
           <p className="rounded-lg border border-red-500/25 bg-red-950/35 px-3 py-2 text-sm text-red-200/95" role="alert">
             {error}
@@ -129,7 +177,7 @@ export function RegisterPage() {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || loading || pendingConfirm}
           className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/15 transition hover:bg-primary/90 disabled:opacity-60"
         >
           {submitting ? "Creating…" : "Register"}

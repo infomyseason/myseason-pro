@@ -67,16 +67,16 @@ const MOCK_COMMUNITY_RACES: CommunityRace[] = [
 
 export function CommunityRaces() {
   return (
-    <section className="relative overflow-hidden border-t border-border/30 py-16 md:py-20">
+    <section className="relative overflow-hidden border-t border-border/30 py-10 md:py-20">
       <div className="relative z-10 mx-auto max-w-7xl px-4">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="mb-5 flex flex-col gap-3 md:mb-8 md:flex-row md:items-end md:justify-between md:gap-4">
           <div>
-            <h2 className="text-3xl font-black text-foreground md:text-5xl">Community races</h2>
-            <p className="mt-2 text-lg text-muted-foreground">Events created by athletes like you</p>
+            <h2 className="text-xl font-black text-foreground md:text-5xl">Community races</h2>
+            <p className="mt-1.5 text-sm text-muted-foreground md:mt-2 md:text-lg">Events created by athletes like you</p>
           </div>
           <button
             type="button"
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary hover:text-primary/80"
+            className="flex shrink-0 items-center gap-2 self-start px-3 py-1.5 text-xs font-semibold text-primary hover:text-primary/80 md:px-4 md:py-2 md:text-sm"
           >
             View all
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
@@ -85,21 +85,25 @@ export function CommunityRaces() {
           </button>
         </div>
 
-        <div className="-mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-4 scrollbar-hide">
+        <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth px-4 pb-4 scrollbar-hide touch-pan-x md:gap-5">
           {MOCK_COMMUNITY_RACES.map((race) => (
-            <RaceCard
+            <div
               key={race.id}
-              mode="sport"
-              sportKey={sportKeyFromLabel(race.sportType)}
-              title={race.title}
-              locationLine={`${race.location}, ${race.countryName}`}
-              flag={race.flag}
-              dateLabel={race.dateLabel}
-              imageUrl={race.imageUrl}
-              distances={race.distances}
-              daysUntil={race.daysUntil}
-              extraBadge="Community"
-            />
+              className="w-[calc((100vw-2rem)*0.91)] max-w-[320px] shrink-0 snap-start md:w-auto md:max-w-none"
+            >
+              <RaceCard
+                mode="sport"
+                sportKey={sportKeyFromLabel(race.sportType)}
+                title={race.title}
+                locationLine={`${race.location}, ${race.countryName}`}
+                flag={race.flag}
+                dateLabel={race.dateLabel}
+                imageUrl={race.imageUrl}
+                distances={race.distances}
+                daysUntil={race.daysUntil}
+                extraBadge="Community"
+              />
+            </div>
           ))}
         </div>
       </div>

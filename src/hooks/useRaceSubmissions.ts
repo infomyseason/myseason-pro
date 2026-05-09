@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useMockAuth, normalizeAuthEmail } from "./useMockAuth"
+import { useAuth } from "../auth/useAuth"
+import { isAdminEmail } from "../lib/adminEmails"
 import { notifyUserDataChanged, USER_DATA_CHANGED_EVENT } from "./userScopedStorage"
 
 export type RaceSubmissionType = "official_race" | "community_race" | "community_event"
@@ -173,10 +174,6 @@ export function saveRaceSubmissions(next: RaceSubmission[]): void {
   notifyUserDataChanged()
 }
 
-export function isAdminEmail(email: string | null | undefined): boolean {
-  return normalizeAuthEmail(email ?? "") === "benilgys@gmail.com"
-}
-
 export function useRaceSubmissions(): {
   submissions: RaceSubmission[]
   isAdmin: boolean
@@ -190,7 +187,7 @@ export function useRaceSubmissions(): {
   approve: (id: string) => void
   reject: (id: string, adminNote?: string) => void
 } {
-  const { user } = useMockAuth()
+  const { user } = useAuth()
   const userId = user?.id ?? null
 
   const [submissions, setSubmissionsState] = useState<RaceSubmission[]>([])

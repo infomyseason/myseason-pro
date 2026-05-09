@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { useMockAuth } from "../../hooks/useMockAuth"
+import { useAuth } from "../../auth/useAuth"
 import { usePersistedProfile } from "../../hooks/usePersistedProfile"
 import { useRaceSubmissions } from "../../hooks/useRaceSubmissions"
 import { useTheme } from "../../hooks/useTheme"
@@ -64,7 +64,7 @@ export function HomeNavbar() {
   const [scrolled, setScrolled] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const profileWrapRef = useRef<HTMLDivElement>(null)
-  const { user, isLoggedIn, logout } = useMockAuth()
+  const { user, isLoggedIn, logout } = useAuth()
   const { submissions, isAdmin } = useRaceSubmissions()
   const { profile } = usePersistedProfile()
   const { mode, toggle: toggleTheme } = useTheme()
@@ -390,7 +390,38 @@ export function HomeNavbar() {
 
       {open ? (
         <div className="border-t border-border/40 bg-background/95 backdrop-blur-xl md:hidden">
-          <div className="mx-auto max-w-7xl space-y-1 px-4 py-4">
+          <div className="mx-auto max-w-7xl max-h-[calc(100svh-4rem)] space-y-2 overflow-y-auto px-4 py-4">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex w-full items-center justify-between rounded-lg bg-secondary/60 px-4 py-3 text-sm font-semibold text-foreground"
+            >
+              <span className="flex items-center gap-2">
+                {mode === "dark" ? (
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true" className="text-primary/90">
+                    <path
+                      d="M12 3v2m0 14v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M3 12h2m14 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true" className="text-primary/90">
+                    <path
+                      d="M21 12.8A7.2 7.2 0 1 1 11.2 3a6 6 0 0 0 9.8 9.8Z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+                Theme
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{mode === "dark" ? "Dark" : "Light"}</span>
+            </button>
             {isAdmin ? (
               <Link
                 to="/admin"
@@ -448,7 +479,7 @@ export function HomeNavbar() {
                 <Link
                   key={link.label}
                   to={link.to}
-                  className="block rounded-lg px-4 py-3 text-sm font-semibold text-foreground"
+                  className="block rounded-lg px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/70"
                   onClick={() => setOpen(false)}
                 >
                   {link.label}
@@ -457,7 +488,7 @@ export function HomeNavbar() {
                 <a
                   key={link.label}
                   href={link.href}
-                  className="block rounded-lg px-4 py-3 text-sm font-semibold text-foreground"
+                  className="block rounded-lg px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/70"
                   onClick={() => setOpen(false)}
                 >
                   {link.label}

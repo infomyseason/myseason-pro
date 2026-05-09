@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { MOCK_RACES_LIST } from "../../data"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
-import { useMockAuth } from "../../hooks/useMockAuth"
+import { useAuth } from "../../auth/useAuth"
 import {
   PROFILE_SPORT_OPTIONS,
   type LocalProfile,
@@ -43,7 +43,7 @@ const TABS = [
 type ProfileTabId = (typeof TABS)[number]["id"]
 
 export function ProfilePage() {
-  const { user } = useMockAuth()
+  const { user } = useAuth()
   const { profile, setProfile } = usePersistedProfile()
   const { ids, toggle } = useFavouriteRaceIds()
   const { plannedCount, completedCount, calendarCount } = useUserRaceLists()
@@ -79,17 +79,17 @@ export function ProfilePage() {
     setEditing(false)
   }, [])
 
-  const saveEdit = useCallback(() => {
+  const saveEdit = useCallback(async () => {
     const displayName = draft.displayName.trim() || user?.displayName?.trim() || ""
     const locationLine = draft.locationLine.trim()
-    setProfile({
+    const ok = await setProfile({
       displayName,
       locationLine,
       avatarUrl: draft.avatarUrl.trim(),
       bio: draft.bio,
       favouriteSportKeys: [...draft.favouriteSportKeys],
     })
-    setEditing(false)
+    if (ok) setEditing(false)
   }, [draft, setProfile, user?.displayName])
 
   useEffect(() => {

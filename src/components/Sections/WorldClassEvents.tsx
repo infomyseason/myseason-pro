@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { Link } from "react-router-dom"
+import { EXPLORE_EVENT_TYPE_LABELS } from "../../pages/explore/exploreFilters"
 import { RaceCard } from "../cards/RaceCard"
 import { sportKeyFromLabel } from "../sportTokens"
 
@@ -218,60 +220,60 @@ export function WorldClassEvents() {
   }, [featuredPaused])
 
   return (
-    <section className="relative overflow-hidden border-t border-border/30 py-16 md:py-20">
+    <section className="relative overflow-hidden border-t border-border/30 py-10 md:py-20">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-0 top-0 h-[400px] w-[400px] rounded-full bg-[#a855f7]/5 blur-[100px]" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-4">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="mb-5 flex flex-col gap-3 md:mb-8 md:flex-row md:items-end md:justify-between md:gap-4">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary md:mb-3 md:px-3 md:py-1 md:text-xs">
               <span className="text-[10px]" aria-hidden="true">
                 ◆
               </span>
               Featured Events
             </div>
-            <h2 className="text-3xl font-black text-foreground md:text-5xl">World-class events</h2>
-            <p className="mt-2 text-base text-muted-foreground md:text-lg">
+            <h2 className="text-xl font-black text-foreground md:text-5xl">World-class events</h2>
+            <p className="mt-1.5 text-sm text-muted-foreground md:mt-2 md:text-lg">
               Official IRONMAN full-distance racing across Europe
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              aria-label="Scroll to previous events"
-              aria-controls="world-class-events-strip"
-              onClick={scrollFeaturedPrev}
-              className="rounded-full border border-border/50 bg-secondary/50 p-2.5 text-foreground backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-secondary disabled:pointer-events-none disabled:opacity-35"
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden items-center gap-2 md:flex">
+              <button
+                type="button"
+                aria-label="Scroll to previous events"
+                aria-controls="world-class-events-strip"
+                onClick={scrollFeaturedPrev}
+                className="rounded-full border border-border/50 bg-secondary/50 p-2.5 text-foreground backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-secondary disabled:pointer-events-none disabled:opacity-35"
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+                  <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Scroll to next events"
+                aria-controls="world-class-events-strip"
+                onClick={scrollFeaturedNext}
+                className="rounded-full border border-border/50 bg-secondary/50 p-2.5 text-foreground backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-secondary disabled:pointer-events-none disabled:opacity-35"
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <Link
+              to={`/explore?eventType=${encodeURIComponent(EXPLORE_EVENT_TYPE_LABELS.world_class)}`}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:text-primary/80 md:ml-2 md:px-4 md:py-2 md:text-sm"
             >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-                <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              aria-label="Scroll to next events"
-              aria-controls="world-class-events-strip"
-              onClick={scrollFeaturedNext}
-              className="rounded-full border border-border/50 bg-secondary/50 p-2.5 text-foreground backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-secondary disabled:pointer-events-none disabled:opacity-35"
-            >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-                <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-            <a
-              href="https://www.ironman.com/races?facet%5B0%5D=race%3AIRONMAN&facet%5B1%5D=region%3AEurope"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-2 flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
-            >
-              IRONMAN Europe
+              World-class event
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
                 <path d="M14 3h7v7M10 14 21 3M21 3v7h-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -285,10 +287,13 @@ export function WorldClassEvents() {
             id="world-class-events-strip"
             role="region"
             aria-label="World-class event cards"
-            className="-mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain px-4 pb-4 scrollbar-hide [scrollbar-width:none] [-ms-overflow-style:none]"
+            className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth px-4 pb-4 [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide touch-pan-x md:gap-5"
           >
             {FEATURED_RACES.map((race) => (
-              <div key={race.id} className="relative">
+              <div
+                key={race.id}
+                className="relative w-[calc((100vw-2rem)*0.91)] max-w-[360px] shrink-0 snap-start md:w-auto md:max-w-none"
+              >
                 <RaceCard
                   mode="featured"
                   sportKey={sportKeyFromLabel(race.sportType)}

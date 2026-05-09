@@ -73,16 +73,16 @@ function Icon({ name, color }: { name: "run" | "waves" | "bike" | "zap"; color: 
 
 export function SportDiscovery() {
   return (
-    <section className="px-4 pb-20">
+    <section className="px-4 pb-12 md:pb-20">
       <div className="mx-auto max-w-5xl">
-        <div className="flex flex-wrap justify-center gap-4 md:gap-6">
+        <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-center md:gap-6">
           {TILES.map((t) => {
             const s = SPORT_STYLES[t.key]
             return (
               <Link
                 key={t.key}
                 to={`/explore?sport=${encodeURIComponent(t.exploreSport)}`}
-                className="group relative flex cursor-pointer items-center gap-4 rounded-2xl border border-border/50 bg-secondary/40 px-6 py-4 backdrop-blur-sm transition-all duration-500 ease-out hover:scale-[1.03] hover:border-primary/25 hover:shadow-xl active:scale-[0.99] md:px-8 md:py-5"
+                className="group relative flex min-h-0 cursor-pointer items-center gap-2.5 rounded-xl border border-border/50 bg-secondary/40 px-3 py-3 backdrop-blur-sm transition-all duration-500 ease-out active:scale-[0.98] md:gap-4 md:rounded-2xl md:px-8 md:py-5 md:hover:scale-[1.03] md:hover:border-primary/25 md:hover:shadow-xl"
               >
                 <div
                   className="absolute inset-0 -z-10 rounded-2xl opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-100"
@@ -93,16 +93,16 @@ export function SportDiscovery() {
                   style={{ boxShadow: `inset 0 0 0 1px ${s.hex}40` }}
                 />
                 <div
-                  className="flex h-12 w-12 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-transform duration-300 md:h-12 md:w-12 md:rounded-xl md:group-hover:scale-110"
                   style={{ backgroundColor: `${s.hex}20` }}
                 >
                   <Icon name={t.icon} color={s.hex} />
                 </div>
-                <div className="text-left">
-                  <span className="block text-lg font-bold transition-colors duration-300" style={{ color: s.hex }}>
+                <div className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-sm font-bold transition-colors duration-300 md:text-lg" style={{ color: s.hex }}>
                     {s.label}
                   </span>
-                  <span className="text-xs text-muted-foreground">{t.count} races</span>
+                  <span className="text-[11px] text-muted-foreground md:text-xs">{t.count} races</span>
                 </div>
               </Link>
             )

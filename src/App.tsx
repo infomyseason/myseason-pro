@@ -13,6 +13,7 @@ import { ForgotPasswordPage } from "./pages/forgot-password/ForgotPasswordPage"
 import { LoginPage } from "./pages/login/LoginPage"
 import { ProfilePage } from "./pages/profile/ProfilePage"
 import { RegisterPage } from "./pages/register/RegisterPage"
+import { UpdatePasswordPage } from "./pages/update-password/UpdatePasswordPage"
 import { RaceDetailPage } from "./pages/race-detail/RaceDetailPage"
 import { SettingsPage } from "./pages/settings/SettingsPage"
 
@@ -25,7 +26,14 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />
         <Route path="/add-race" element={<AddRacePage />} />
-        <Route path="/my-calendar" element={<MyCalendarPage />} />
+        <Route
+          path="/my-calendar"
+          element={
+            <RequireAuth signInNotice="Sign in to view and manage your race calendar.">
+              <MyCalendarPage />
+            </RequireAuth>
+          }
+        />
         <Route path="/community" element={<CommunityPage />} />
         <Route
           path="/admin"
@@ -38,6 +46,7 @@ function App() {
         <Route path="/race/:raceId" element={<RaceDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/update-password" element={<UpdatePasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route
           path="/profile"

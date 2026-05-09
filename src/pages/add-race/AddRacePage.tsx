@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { useMockAuth } from "../../hooks/useMockAuth"
+import { useAuth } from "../../auth/useAuth"
 import { useRaceSubmissions, type RaceSubmissionType, type RegistrationStatus } from "../../hooks/useRaceSubmissions"
 import { Footer } from "../../components/Footer"
 import { HomeNavbar } from "../../components/marketing/HomeNavbar"
@@ -29,7 +29,7 @@ function TypeChip({ active, children, onClick }: { active: boolean; children: Re
 export function AddRacePage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { isLoggedIn, user } = useMockAuth()
+  const { isLoggedIn, user } = useAuth()
   const { submit, isAdmin, submissions, canEdit, updateAsCurrentUser } = useRaceSubmissions()
 
   const editId = searchParams.get("edit")
@@ -152,16 +152,16 @@ export function AddRacePage() {
     <div className="min-h-screen bg-background">
       <HomeNavbar />
 
-      <main className="relative overflow-hidden pb-20 pt-24">
+      <main className="relative overflow-hidden pb-14 pt-20 sm:pb-20 sm:pt-24">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-1/4 top-0 h-[360px] w-[360px] -translate-x-1/2 rounded-full bg-primary/8 blur-[110px]" />
           <div className="absolute bottom-0 right-0 h-[280px] w-[280px] rounded-full bg-[#3b82f6]/10 blur-[95px]" />
         </div>
 
         <div className="relative z-10 mx-auto max-w-3xl px-4 sm:px-6">
-          <header className="mb-8">
+          <header className="mb-6 sm:mb-8">
             <p className="text-xs font-bold uppercase tracking-wider text-primary/90">Submit</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-foreground md:text-4xl">Add Race / Event</h1>
+            <h1 className="mt-2 text-2xl font-black tracking-tight text-foreground sm:text-3xl md:text-4xl">Add Race / Event</h1>
             <p className="mt-2 text-sm text-muted-foreground md:text-base">
               Share official races, community races, or community events. Official submissions go through approval.
             </p>

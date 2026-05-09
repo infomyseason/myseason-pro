@@ -157,26 +157,26 @@ export function LocalRaces() {
   }, [selectedCountryCode, selectedCountryLabel])
 
   const chipBase =
-    "inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium backdrop-blur-xl transition-colors duration-200"
+    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium backdrop-blur-xl transition-colors duration-200 md:gap-2 md:px-3 md:py-1.5 md:text-sm"
 
   return (
-    <section className="relative overflow-x-hidden border-t border-border/30 py-10 md:py-14">
+    <section className="relative overflow-x-hidden border-t border-border/30 py-6 md:py-14">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute right-0 top-0 h-[420px] w-[420px] rounded-full bg-primary/5 blur-[100px]" />
         <div className="absolute bottom-0 left-0 h-[320px] w-[320px] rounded-full bg-[#3b82f6]/6 blur-[95px]" />
       </div>
 
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-5 flex min-w-0 flex-col gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0 max-w-full flex-1 sm:pr-4">
             <div className="mb-2 inline-flex max-w-full items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
               <span className="size-1 shrink-0 animate-pulse rounded-full bg-primary" />
               <span className="truncate">{eyebrow}</span>
             </div>
-            <h2 className="text-balance break-words text-2xl font-black tracking-tight text-foreground sm:text-3xl md:text-4xl">
+            <h2 className="text-balance break-words text-xl font-black tracking-tight text-foreground sm:text-3xl md:text-4xl">
               {heading}
             </h2>
-            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground md:text-base">
               {contextLine}
             </p>
           </div>
@@ -189,9 +189,9 @@ export function LocalRaces() {
           </a>
         </div>
 
-        <div className="mb-5 grid min-w-0 w-full max-w-full grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-x-5 md:gap-y-2">
+        <div className="mb-4 grid min-w-0 w-full max-w-full grid-cols-1 gap-2 md:mb-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-x-5 md:gap-y-2">
           <div
-            className="flex min-w-0 flex-wrap content-start gap-2 md:pr-2"
+            className="-mx-4 flex min-w-0 flex-nowrap gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0 md:pr-2"
             role="group"
             aria-label="Country filters"
           >
@@ -214,7 +214,7 @@ export function LocalRaces() {
                   }`}
                 >
                   {opt.flag ? (
-                    <span className="text-base leading-none" aria-hidden="true">
+                    <span className="text-sm leading-none md:text-base" aria-hidden="true">
                       {opt.flag}
                     </span>
                   ) : null}
@@ -246,7 +246,7 @@ export function LocalRaces() {
               aria-expanded={searchOpen && countryQuery.trim().length > 0}
               aria-controls="local-races-country-results"
               aria-autocomplete="list"
-              className="relative z-10 h-9 w-full min-w-0 max-w-full rounded-full border border-border/55 bg-background/40 pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/65 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/[0.02] transition-colors focus:border-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/15 md:text-[13px]"
+              className="relative z-10 h-8 w-full min-w-0 max-w-full rounded-full border border-border/55 bg-background/40 pl-9 pr-3 text-[11px] text-foreground placeholder:text-muted-foreground/65 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/[0.02] transition-colors focus:border-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/15 md:h-9 md:text-[13px]"
               aria-label="Search European countries"
             />
             {searchOpen && countryQuery.trim().length > 0 ? (
@@ -295,7 +295,7 @@ export function LocalRaces() {
                 type="button"
                 aria-label="Previous race"
                 aria-controls="local-races-carousel"
-                className={`${CAROUSEL_ARROW_CLASS} left-0 sm:left-1`}
+                className={`${CAROUSEL_ARROW_CLASS} left-0 hidden sm:left-1 md:flex`}
                 onClick={scrollRacesPrev}
               >
                 <ChevronLeft className="size-5 opacity-95 sm:size-[22px]" />
@@ -304,7 +304,7 @@ export function LocalRaces() {
                 type="button"
                 aria-label="Next race"
                 aria-controls="local-races-carousel"
-                className={`${CAROUSEL_ARROW_CLASS} right-0 sm:right-1`}
+                className={`${CAROUSEL_ARROW_CLASS} right-0 hidden sm:right-1 md:flex`}
                 onClick={scrollRacesNext}
               >
                 <ChevronRight className="size-5 opacity-95 sm:size-[22px]" />
@@ -317,26 +317,30 @@ export function LocalRaces() {
             role="region"
             aria-roledescription="carousel"
             aria-label={heading}
-            className="flex min-w-0 w-full max-w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3 scrollbar-hide [scrollbar-width:none] [-ms-overflow-style:none]"
+            className="flex min-w-0 w-full max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth pb-3 [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide touch-pan-x md:gap-4"
           >
             {filteredRaces.map((race) => (
-              <RaceCard
+              <div
                 key={race.id}
-                mode="local"
-                compactListing
-                sportKey={sportKeyFromLabel(race.raceType)}
-                title={race.title}
-                locationLine={`${race.city}, ${race.countryName}`}
-                flag={FLAG_BY_CODE[race.countryCode] ?? "🏁"}
-                dateLabel={race.dateLabel}
-                imageUrl={race.imageUrl}
-                distances={race.distances}
-                daysUntil={race.daysUntil}
-                to={`/race/${race.id}`}
-                startingPriceLabel={homepagePriceLabel(race.startingPriceLabel)}
-                registrationStatus={race.registrationStatus}
-                priceNote={race.priceNote}
-              />
+                className="w-[calc((100vw-2rem)*0.91)] max-w-[320px] shrink-0 snap-start md:w-auto md:max-w-none"
+              >
+                <RaceCard
+                  mode="local"
+                  compactListing
+                  sportKey={sportKeyFromLabel(race.raceType)}
+                  title={race.title}
+                  locationLine={`${race.city}, ${race.countryName}`}
+                  flag={FLAG_BY_CODE[race.countryCode] ?? "🏁"}
+                  dateLabel={race.dateLabel}
+                  imageUrl={race.imageUrl}
+                  distances={race.distances}
+                  daysUntil={race.daysUntil}
+                  to={`/race/${race.id}`}
+                  startingPriceLabel={homepagePriceLabel(race.startingPriceLabel)}
+                  registrationStatus={race.registrationStatus}
+                  priceNote={race.priceNote}
+                />
+              </div>
             ))}
           </div>
         </div>

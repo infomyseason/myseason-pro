@@ -121,42 +121,42 @@ export function SeasonPlannerPreview() {
   )
 
   return (
-    <section className="relative overflow-hidden border-t border-border/30 py-16 md:py-20">
+    <section className="relative overflow-hidden border-t border-border/30 py-10 md:py-20">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute right-1/4 top-1/2 h-72 w-72 rounded-full bg-primary/5 blur-[90px]" />
       </div>
 
-      <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-4 lg:grid-cols-2 lg:gap-16">
+      <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-8 px-4 md:gap-12 lg:grid-cols-2 lg:gap-16">
         <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary md:mb-3 md:px-3 md:py-1 md:text-xs">
             <span className="size-1.5 rounded-full bg-primary" />
             Season Planner
           </div>
 
-          <h2 className="text-3xl font-black tracking-tight text-foreground md:text-4xl lg:text-5xl">
+          <h2 className="text-xl font-black tracking-tight text-foreground md:text-4xl lg:text-5xl">
             Build your race calendar. <span className="text-primary">Chase your goals.</span>
           </h2>
 
-          <p className="mt-4 text-lg text-muted-foreground">
+          <p className="mt-3 text-sm text-muted-foreground md:mt-4 md:text-lg">
             Save races, track your season progress, and never miss registration deadlines. Your personal race
             timeline awaits.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-1.5 md:mt-6 md:gap-2">
             {["Track deadlines", "Set goals", "Celebrate PRs"].map((b) => (
               <span
                 key={b}
-                className="rounded-full border border-border/50 bg-secondary/50 px-4 py-2 text-sm font-semibold text-foreground/90 backdrop-blur-sm"
+                className="rounded-full border border-border/50 bg-secondary/50 px-3 py-1.5 text-[11px] font-semibold text-foreground/90 backdrop-blur-sm md:px-4 md:py-2 md:text-sm"
               >
                 {b}
               </span>
             ))}
           </div>
 
-          <div className="mt-10">
+          <div className="mt-6 md:mt-10">
             <Link
               to="/my-calendar"
-              className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 md:w-auto md:px-8 md:py-4"
             >
               Start planning your season
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" className="ml-2" aria-hidden="true">

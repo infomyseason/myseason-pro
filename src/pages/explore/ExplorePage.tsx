@@ -840,7 +840,7 @@ export function ExplorePage() {
             aria-label="Close filters"
             onClick={() => setFiltersDrawerOpen(false)}
           />
-          <div className="explore-filters-drawer-panel absolute right-0 top-0 flex h-full w-[min(100%,380px)] flex-col border-l border-border/45 bg-background/95 shadow-2xl backdrop-blur-xl">
+          <div className="explore-filters-drawer-panel absolute right-0 top-0 flex h-full w-[min(100%,420px)] flex-col border-l border-border/45 bg-background/95 shadow-2xl backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-border/45 px-4 py-3">
               <span className="text-sm font-black text-foreground">Filters</span>
               <button
@@ -854,7 +854,17 @@ export function ExplorePage() {
                 </svg>
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">{filterPanelInner}</div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-28">{filterPanelInner}</div>
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background/95 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 border-t border-border/40 bg-background/90 px-4 py-3 backdrop-blur-xl">
+              <button
+                type="button"
+                className="w-full rounded-xl bg-primary/90 py-3 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/15 transition hover:bg-primary"
+                onClick={() => setFiltersDrawerOpen(false)}
+              >
+                Show results
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom"
 import type { SportKey } from "../sportTokens"
 import { SPORT_STYLES } from "../sportTokens"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
+import { useRequireLoginAction } from "../../hooks/useRequireLoginAction"
 
 export type RaceCardMode = "local" | "sport" | "featured"
 
@@ -82,6 +83,7 @@ export function RaceCard({
 }: RaceCardProps) {
   const sport = SPORT_STYLES[sportKey]
   const { toggle, isFavourite } = useFavouriteRaceIds()
+  const { guardOrRun } = useRequireLoginAction()
   const favId = to ? (to.startsWith("/race/") ? to.slice("/race/".length) : to) : ""
   const fav = favId ? isFavourite(favId) : false
   const hoverShadow = `hover:shadow-[0_0_60px_rgba(${sport.rgb},0.3)]`
@@ -144,17 +146,17 @@ export function RaceCard({
           style={{ backgroundColor: sport.hex }}
         />
 
-        <div className="absolute left-4 right-4 top-4 z-10 flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap gap-2">
+        <div className="absolute left-3 right-3 top-3 z-10 flex items-start justify-between gap-2 sm:left-4 sm:right-4 sm:top-4">
+          <div className="flex min-w-0 max-w-[calc(100%-3.25rem)] flex-wrap content-start gap-1.5 sm:max-w-[calc(100%-4rem)] sm:gap-2">
             <span
-              className="rounded-md px-3 py-1.5 text-xs font-bold text-white shadow-lg"
+              className="rounded-md px-2 py-0.5 text-[10px] font-bold leading-tight text-white shadow-md sm:px-3 sm:py-1 sm:text-xs sm:shadow-lg"
               style={{ backgroundColor: sport.hex }}
             >
               {sport.emoji} {sport.label}
             </span>
             {registrationStatus ? (
               <span
-                className={`rounded-md border px-3 py-1 text-[11px] font-bold uppercase tracking-wide shadow-lg backdrop-blur-sm ${
+                className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide shadow-md backdrop-blur-sm sm:px-3 sm:py-1 sm:text-[11px] sm:shadow-lg ${
                   registrationStatus === "open"
                     ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"
                     : registrationStatus === "closingSoon"
@@ -179,26 +181,29 @@ export function RaceCard({
               </span>
             ) : null}
             {!compactListing && extraBadge ? (
-              <span className="rounded-md border border-primary/35 bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-lg backdrop-blur-sm">
+              <span className="rounded-md border border-primary/35 bg-primary/15 px-2 py-0.5 text-[10px] font-bold leading-tight text-primary shadow-md backdrop-blur-sm sm:px-3 sm:py-1 sm:text-xs sm:shadow-lg">
                 {extraBadge}
               </span>
             ) : null}
             {!compactListing && major ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-1 text-xs font-bold text-black shadow-lg">
-                <span aria-hidden="true">🏆</span>
+              <span className="inline-flex items-center gap-0.5 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-0.5 text-[10px] font-bold leading-tight text-black shadow-md sm:gap-1 sm:px-3 sm:py-1 sm:text-xs sm:shadow-lg">
+                <span aria-hidden="true" className="text-[9px] sm:text-xs">
+                  🏆
+                </span>
                 Major
               </span>
             ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {mode === "local" && daysUntil != null ? (
-              <span className="rounded-full border border-white/25 bg-black/55 px-3 py-1.5 text-xs font-bold text-white shadow-lg backdrop-blur-md">
-                {daysUntil} days
-              </span>
-            ) : null}
-            {mode === "sport" && daysUntil != null ? (
-              <span className="rounded-full border border-white/20 bg-black/50 px-3 py-1.5 text-xs font-bold text-white shadow-lg backdrop-blur-md">
-                {daysUntil} days
+          <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+            {daysUntil != null ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-black/55 px-2 py-0.5 text-[10px] font-bold leading-none text-white shadow-md backdrop-blur-md sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs sm:shadow-lg">
+                {mode === "featured" ? (
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" className="shrink-0 text-primary sm:size-[14px]" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                    <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                ) : null}
+                <span className="whitespace-nowrap">{daysUntil} days</span>
               </span>
             ) : null}
             {!externalHref && favId ? (
@@ -209,9 +214,12 @@ export function RaceCard({
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  toggle(favId)
+                  guardOrRun(
+                    () => toggle(favId),
+                    "Sign in to save favourites — they appear under Profile → Favourites.",
+                  )
                 }}
-                className={`flex size-9 shrink-0 items-center justify-center rounded-full border backdrop-blur-md transition hover:scale-110 ${
+                className={`flex size-8 shrink-0 items-center justify-center rounded-full border backdrop-blur-md transition hover:scale-110 sm:size-9 ${
                   fav
                     ? "border-primary/35 bg-primary/15 text-primary hover:bg-primary/20"
                     : "border-border/55 bg-background/30 text-white/80 hover:bg-background/45 hover:text-white"
@@ -222,18 +230,6 @@ export function RaceCard({
             ) : null}
           </div>
         </div>
-
-        {mode === "featured" && daysUntil != null ? (
-          <div className="absolute left-4 top-16 z-10">
-            <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/50 px-3 py-1.5 shadow-lg backdrop-blur-md">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" className="text-primary" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-                <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              <span className="text-xs font-bold text-white">{daysUntil} days</span>
-            </div>
-          </div>
-        ) : null}
 
         <div className={`absolute bottom-0 left-0 right-0 z-10 ${compactListing ? "p-5 pb-6 pt-2" : "p-5"}`}>
           <div className={`flex items-center gap-2 ${compactListing ? "mb-3" : "mb-2"}`}>

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { computeDaysUntilRace, getRaceDetailById, getSubmittedRaceDetailById } from "../../data"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
-import { useUserRaceLists, type CalendarEntry, type CalendarGoalType } from "../../hooks/useUserRaceLists"
+import { useRequireLoginAction } from "../../hooks/useRequireLoginAction"
+import { useUserRaceLists, type CalendarEntry } from "../../hooks/useUserRaceLists"
 import { useRaceSubmissions } from "../../hooks/useRaceSubmissions"
 import { SPORT_STYLES, sportKeyFromLabel } from "../../components/sportTokens"
 
@@ -69,12 +70,8 @@ export function RaceDetailPage() {
   const [routeMapOpen, setRouteMapOpen] = useState(false)
   const { toggle, isFavourite } = useFavouriteRaceIds()
   const { calendarEntries, setLists, plannedRaceIds, completedRaceIds } = useUserRaceLists()
+  const { guardOrRun, isLoggedIn } = useRequireLoginAction()
   const { submissions, canEdit } = useRaceSubmissions()
-
-  const [calendarModalOpen, setCalendarModalOpen] = useState(false)
-  const [planDistance, setPlanDistance] = useState("")
-  const [planGoal, setPlanGoal] = useState<CalendarGoalType | "">("")
-  const [planNote, setPlanNote] = useState("")
 
   const canGoBack = useMemo(() => {
     const idx = (window.history.state as { idx?: unknown } | null)?.idx
@@ -195,135 +192,24 @@ export function RaceDetailPage() {
         </div>
       </header>
 
-      <div className="relative mx-auto max-w-5xl px-4 pb-10 pt-4 sm:px-6 sm:pt-5">
-        {calendarModalOpen ? (
-          <div
-            className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Add to your season calendar"
-          >
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              aria-label="Close"
-              onClick={() => setCalendarModalOpen(false)}
-            />
-            <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-border/55 bg-background/95 shadow-2xl backdrop-blur-xl">
-              <div className="border-b border-border/40 px-5 py-4">
-                <p className="text-sm font-black text-foreground">Add to your season calendar</p>
-                <p className="mt-1 text-xs text-muted-foreground">Choose your distance and optional goal.</p>
-              </div>
-
-              <div className="px-5 py-5">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Distance / category</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {distanceOptions.map((d) => {
-                    const active = planDistance === d
-                    return (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => setPlanDistance(d)}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          active
-                            ? "border-primary/55 bg-primary/18 text-primary"
-                            : "border-border/55 bg-secondary/35 text-foreground hover:border-primary/30 hover:bg-secondary/55"
-                        }`}
-                      >
-                        {d}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Goal (optional)</p>
-                    <select
-                      value={planGoal}
-                      onChange={(e) => setPlanGoal(e.target.value as any)}
-                      className="mt-2 w-full rounded-xl border border-border/55 bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none ring-primary/15 focus:border-primary/40 focus:ring-2"
-                    >
-                      <option value="">No goal</option>
-                      <option value="justFinish">Just finish</option>
-                      <option value="pbAttempt">PB attempt</option>
-                      <option value="trainingRace">Training race</option>
-                      <option value="aRace">A race</option>
-                      <option value="bRace">B race</option>
-                      <option value="cRace">C race</option>
-                    </select>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Note (optional)</p>
-                    <textarea
-                      value={planNote}
-                      onChange={(e) => setPlanNote(e.target.value)}
-                      className="mt-2 min-h-[84px] w-full resize-y rounded-xl border border-border/55 bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none ring-primary/15 focus:border-primary/40 focus:ring-2"
-                      placeholder="e.g. Fuel plan, pacing, travel, recovery focus…"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 border-t border-border/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <button
-                  type="button"
-                  className="rounded-full border border-border/55 bg-secondary/40 px-5 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
-                  onClick={() => setCalendarModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!planDistance.trim()}
-                  className="rounded-full bg-primary/90 px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/15 transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => {
-                    const dist = planDistance.trim()
-                    if (!dist) return
-                    const prev = calendarEntries
-                    const existing = prev.find((e) => e.raceId === race.id)
-                    const nextEntry: CalendarEntry = {
-                      raceId: race.id,
-                      selectedDistance: dist,
-                      ...(planGoal ? { goalType: planGoal as CalendarGoalType } : {}),
-                      ...(planNote.trim() ? { userNote: planNote.trim() } : {}),
-                      addedAt: existing?.addedAt ?? new Date().toISOString(),
-                    }
-                    const nextEntries = existing
-                      ? prev.map((e) => (e.raceId === race.id ? nextEntry : e))
-                      : [nextEntry, ...prev]
-
-                    setLists({
-                      plannedRaceIds,
-                      completedRaceIds,
-                      calendarEntries: nextEntries,
-                    })
-                    setCalendarModalOpen(false)
-                  }}
-                >
-                  Save to calendar
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] shadow-[0_24px_80px_-40px_rgba(0,0,0,0.85)] ring-1 ring-white/[0.04]">
-          <div className="relative h-[180px] w-full md:h-[240px]">
+      <div className="relative mx-auto max-w-5xl px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-5">
+        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_12px_40px_-18px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.03] dark:border-white/[0.08] dark:bg-transparent dark:shadow-[0_24px_80px_-40px_rgba(0,0,0,0.85)] dark:ring-white/[0.04]">
+          <div className="relative h-[150px] w-full sm:h-[180px] md:h-[240px]">
             <img src={race.image} alt={race.title} className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-transparent" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center_top,transparent_40%,rgba(9,11,16,0.65)_100%)]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent dark:via-background/55" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center_top,transparent_45%,rgba(255,255,255,0.65)_100%)] dark:bg-[radial-gradient(ellipse_at_center_top,transparent_40%,rgba(9,11,16,0.65)_100%)]" />
             {charityTone ? (
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(236,72,153,0.14)_0%,transparent_42%,transparent_100%)]" />
             ) : null}
           </div>
         </div>
 
-        <div className="-mt-10 relative z-10 md:-mt-12">
+        <div className="-mt-8 relative z-10 sm:-mt-10 md:-mt-12">
           <div
-            className={`rounded-2xl border border-white/[0.08] bg-[#0c1018]/90 p-5 shadow-xl backdrop-blur-xl sm:p-6 ${
-              charityTone ? "ring-1 ring-pink-500/20 ring-offset-0" : "ring-1 ring-white/[0.05]"
+            className={`rounded-2xl border border-border/80 bg-card/95 p-4 shadow-[0_8px_32px_-16px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-6 dark:border-white/[0.08] dark:bg-[#0c1018]/90 dark:shadow-xl ${
+              charityTone
+                ? "ring-1 ring-pink-400/25 ring-offset-0 dark:ring-pink-500/20"
+                : "ring-1 ring-black/[0.04] dark:ring-white/[0.05]"
             }`}
           >
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -334,15 +220,17 @@ export function RaceDetailPage() {
                 {sport.emoji} {race.sport}
               </span>
               <span
-                className={`rounded-md border bg-white/[0.06] px-3 py-1 text-xs font-semibold text-foreground/90 ${
-                  charityTone ? "border-pink-400/35 text-pink-50/95" : "border-white/15"
+                className={`rounded-md border px-3 py-1 text-xs font-semibold ${
+                  charityTone
+                    ? "border-pink-200 bg-pink-50 text-pink-900 dark:border-pink-400/35 dark:bg-pink-500/[0.09] dark:text-pink-50/95"
+                    : "border-border bg-muted/80 text-foreground/90 dark:border-white/15 dark:bg-white/[0.06]"
                 }`}
               >
                 {race.category}
               </span>
             </div>
 
-            <h1 className="text-balance text-3xl font-black tracking-tight text-foreground sm:text-4xl md:text-[2.25rem]">
+            <h1 className="text-balance text-2xl font-black tracking-tight text-foreground sm:text-4xl md:text-[2.25rem]">
               {race.title}
             </h1>
             {race.organizer ? (
@@ -355,12 +243,12 @@ export function RaceDetailPage() {
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{race.description}</p>
             ) : null}
 
-            <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
               <a
                 href={race.officialWebsite}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full border border-primary/35 bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition hover:bg-primary/90 sm:w-auto sm:min-w-[200px] sm:text-[15px] sm:py-3"
+                className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full border border-primary/35 bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition hover:bg-primary/90 sm:w-auto sm:min-w-[200px] sm:py-3.5 sm:text-[15px]"
               >
                 Official website
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
@@ -369,9 +257,14 @@ export function RaceDetailPage() {
               </a>
               <button
                 type="button"
-                onClick={() => toggle(race.id)}
+                onClick={() =>
+                  guardOrRun(
+                    () => toggle(race.id),
+                    "Sign in to save favourites — they appear under Profile → Favourites.",
+                  )
+                }
                 aria-pressed={savedToFavourites}
-                className={`inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition sm:w-auto sm:px-5 ${
+                className={`inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition sm:w-auto sm:px-5 sm:py-3.5 ${
                   savedToFavourites
                     ? "border border-primary/40 bg-primary/12 text-primary ring-1 ring-primary/20 hover:bg-primary/[0.16]"
                     : "border border-primary/22 bg-primary/[0.07] text-foreground hover:border-primary/35 hover:bg-primary/[0.1]"
@@ -388,39 +281,63 @@ export function RaceDetailPage() {
                   Edit event
                 </Link>
               ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  const defaultDistance =
-                    existingPlan?.selectedDistance?.trim() || (distanceOptions.length === 1 ? (distanceOptions[0] ?? "") : "")
-                  setPlanDistance(defaultDistance)
-                  setPlanGoal((existingPlan?.goalType ?? "") as any)
-                  setPlanNote(existingPlan?.userNote ?? "")
-                  setCalendarModalOpen(true)
-                }}
-                className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors sm:w-auto ${
-                  inCalendar
-                    ? "border border-primary/40 bg-primary/12 text-primary ring-1 ring-primary/20 hover:bg-primary/[0.16]"
-                    : "border border-white/[0.12] bg-white/[0.06] text-foreground hover:border-primary/25 hover:bg-white/[0.09]"
-                }`}
-              >
-                <span aria-hidden="true">📅</span>
-                <span>{inCalendar ? "Edit plan" : "Add to calendar"}</span>
-              </button>
+              {inCalendar ? (
+                <Link
+                  to="/my-calendar"
+                  title="Set distance, goal, and notes on My Calendar"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-primary/40 bg-primary/12 px-4 py-3 text-[13px] font-semibold text-primary shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] ring-1 ring-primary/20 transition-colors hover:bg-primary/[0.16] sm:w-auto sm:py-3.5"
+                >
+                  <span aria-hidden="true">📅</span>
+                  <span>In My Calendar</span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    guardOrRun(() => {
+                      const dist =
+                        (distanceOptions[0] ?? race.distances[0] ?? "Distance TBD").trim() || "Distance TBD"
+                      const prev = calendarEntries
+                      const nextEntry: CalendarEntry = {
+                        raceId: race.id,
+                        selectedDistance: dist,
+                        addedAt: new Date().toISOString(),
+                      }
+                      setLists({
+                        plannedRaceIds,
+                        completedRaceIds,
+                        calendarEntries: [nextEntry, ...prev],
+                      })
+                    }, "Sign in to add races to your calendar.")
+                  }
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border bg-muted/90 px-4 py-3 text-[13px] font-semibold text-foreground shadow-sm transition-colors hover:border-primary/35 hover:bg-muted dark:border-white/[0.12] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] dark:hover:bg-white/[0.09] sm:w-auto sm:py-3.5"
+                >
+                  <span aria-hidden="true">📅</span>
+                  <span>Add to calendar</span>
+                </button>
+              )}
             </div>
+
+            {!isLoggedIn ? (
+              <p className="mt-3 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                Saving favourites requires an account. After you sign in, open{" "}
+                <strong className="font-semibold text-foreground/90">Profile</strong> →{" "}
+                <strong className="font-semibold text-foreground/90">Favourites</strong> to see saved races.
+              </p>
+            ) : null}
 
             {registrationLabel ? (
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span
                   className={`inline-flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-wide ${
                     race.registrationStatus === "open"
-                      ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-200"
                       : race.registrationStatus === "closingSoon"
-                        ? "border-amber-300/25 bg-amber-400/10 text-amber-200"
+                        ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-300/25 dark:bg-amber-400/10 dark:text-amber-200"
                         : race.registrationStatus === "soldOut"
-                          ? "border-red-400/25 bg-red-950/20 text-red-200"
+                          ? "border-red-200 bg-red-50 text-red-900 dark:border-red-400/25 dark:bg-red-950/20 dark:text-red-200"
                           : race.registrationStatus === "notOpenYet"
-                            ? "border-sky-300/20 bg-sky-500/10 text-sky-200"
+                            ? "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-300/20 dark:bg-sky-500/10 dark:text-sky-200"
                             : "border-border/55 bg-secondary/40 text-muted-foreground"
                   }`}
                   title={race.lastCheckedAt?.trim() ? `Last checked: ${race.lastCheckedAt}` : undefined}
@@ -437,7 +354,7 @@ export function RaceDetailPage() {
               </p>
             )}
 
-            <div className="mt-5 space-y-2 border-b border-white/[0.06] pb-4">
+            <div className="mt-5 space-y-2 border-b border-border/70 pb-4 dark:border-white/[0.06]">
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
                 <span className="inline-flex items-center gap-2">
                   <span aria-hidden="true">📍</span>
@@ -468,14 +385,14 @@ export function RaceDetailPage() {
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <div
-                className={`flex min-h-[5.25rem] flex-col justify-center rounded-xl border border-primary/25 bg-primary/[0.07] px-4 py-4 ring-1 sm:min-h-[5.5rem] sm:py-[1.125rem] ${
-                  charityTone ? "ring-pink-500/25" : "ring-primary/15"
+                className={`flex min-h-[5.25rem] flex-col justify-center rounded-xl border border-primary/30 bg-primary/[0.09] px-4 py-4 shadow-sm ring-1 sm:min-h-[5.5rem] sm:py-[1.125rem] dark:border-primary/25 dark:bg-primary/[0.07] dark:shadow-none ${
+                  charityTone ? "ring-pink-400/30 dark:ring-pink-500/25" : "ring-primary/20 dark:ring-primary/15"
                 }`}
               >
                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">Countdown</div>
                 <div className="mt-1 text-base font-black leading-snug text-foreground">{countdownLabel}</div>
               </div>
-              <div className="flex min-h-[5.25rem] flex-col justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 ring-1 ring-white/[0.05] sm:min-h-[5.5rem] sm:py-[1.125rem]">
+              <div className="flex min-h-[5.25rem] flex-col justify-center rounded-xl border border-border/70 bg-muted/50 px-4 py-4 shadow-sm ring-1 ring-black/[0.02] sm:min-h-[5.5rem] sm:py-[1.125rem] dark:border-white/[0.08] dark:bg-white/[0.03] dark:shadow-none dark:ring-white/[0.05]">
                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                   {charityTone ? "Community turnout" : isFestival ? "Expected participants" : "Participants"}
                 </div>
@@ -490,7 +407,7 @@ export function RaceDetailPage() {
                   <p className="mt-2 text-[11px] leading-snug text-muted-foreground/88">{race.participantFootnote}</p>
                 ) : null}
               </div>
-              <div className="flex min-h-[5.25rem] flex-col justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-4 ring-1 ring-white/[0.05] sm:min-h-[5.5rem] sm:py-[1.125rem]">
+              <div className="flex min-h-[5.25rem] flex-col justify-center rounded-xl border border-border/70 bg-muted/50 px-4 py-4 shadow-sm ring-1 ring-black/[0.02] sm:min-h-[5.5rem] sm:py-[1.125rem] dark:border-white/[0.08] dark:bg-white/[0.03] dark:shadow-none dark:ring-white/[0.05]">
                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Entry</div>
                 <div className="mt-1 text-base font-black leading-snug text-foreground">
                   {race.startingPriceLabel?.trim() ? (
@@ -520,7 +437,7 @@ export function RaceDetailPage() {
               </div>
             ) : null}
 
-            <div className={`mt-6 ${isFestival ? "border-t border-white/[0.06] pt-6" : ""}`}>
+            <div className={`mt-6 ${isFestival ? "border-t border-border/70 pt-6 dark:border-white/[0.06]" : ""}`}>
               <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 {isFestival ? "Experiences & sessions" : "Distances"}
               </h2>
@@ -528,7 +445,7 @@ export function RaceDetailPage() {
                 {race.distances.map((d) => (
                   <span
                     key={d}
-                    className="rounded-full border border-white/15 bg-[#0a0d14]/55 px-3 py-1.5 text-sm font-medium text-foreground backdrop-blur-md"
+                    className="rounded-full border border-border bg-muted px-3 py-1.5 text-sm font-semibold text-foreground shadow-sm dark:border-white/15 dark:bg-[#0a0d14]/55 dark:shadow-none dark:backdrop-blur-md"
                   >
                     {d}
                   </span>
@@ -537,7 +454,7 @@ export function RaceDetailPage() {
             </div>
 
             {race.showCoursePendingNotice && !race.courseRoute ? (
-              <div className="mt-6 border-t border-white/[0.06] pt-6">
+              <div className="mt-6 border-t border-border/70 pt-6 dark:border-white/[0.06]">
                 <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Course</h2>
                 <p className="text-sm leading-relaxed text-muted-foreground">Route not published yet</p>
                 {race.courseProfile.length > 0 ? (
@@ -559,7 +476,7 @@ export function RaceDetailPage() {
             ) : null}
 
             {race.courseRoute ? (
-              <div className="mt-6 border-t border-white/[0.06] pt-6">
+              <div className="mt-6 border-t border-border/70 pt-6 dark:border-white/[0.06]">
                 <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
                   {charityTone ? "Route & gathering" : "Course"}
                 </h2>
@@ -569,7 +486,7 @@ export function RaceDetailPage() {
                       <button
                         type="button"
                         onClick={() => setRouteMapOpen(true)}
-                        className="group relative h-28 w-full overflow-hidden rounded-lg border border-white/[0.08] text-left ring-1 ring-white/[0.04] transition-transform duration-300 hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c1018] sm:h-[5.5rem] sm:w-[7.25rem]"
+                        className="group relative h-28 w-full overflow-hidden rounded-lg border border-border text-left shadow-sm ring-1 ring-black/[0.03] transition-transform duration-300 hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/[0.08] dark:shadow-none dark:ring-white/[0.04] sm:h-[5.5rem] sm:w-[7.25rem]"
                         aria-label="View course map"
                       >
                         <img
@@ -585,11 +502,11 @@ export function RaceDetailPage() {
                         </div>
                       </button>
                     ) : (
-                      <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-lg border border-white/[0.08] ring-1 ring-white/[0.04] sm:h-[5.5rem] sm:w-[7.25rem]">
+                      <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-lg border border-border shadow-sm ring-1 ring-black/[0.03] dark:border-white/[0.08] dark:shadow-none dark:ring-white/[0.04] sm:h-[5.5rem] sm:w-[7.25rem]">
                         {routePreviewSrc ? (
                           <img src={routePreviewSrc} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-white/[0.04]" aria-hidden />
+                          <div className="flex h-full w-full items-center justify-center bg-muted dark:bg-white/[0.04]" aria-hidden />
                         )}
                         <div className="pointer-events-none absolute inset-0 bg-black/25" />
                       </div>
@@ -662,11 +579,11 @@ export function RaceDetailPage() {
               </div>
             ) : null}
 
-            <div className="mt-6 border-t border-white/[0.06] pt-6">
+            <div className="mt-6 border-t border-border/70 pt-6 dark:border-white/[0.06]">
               <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Pricing</h2>
               {race.pricing.length > 0 ? (
                 <>
-                  <ul className="divide-y divide-white/[0.06] rounded-xl border border-white/[0.08] bg-[#0a0d14]/40 ring-1 ring-white/[0.04]">
+                  <ul className="divide-y divide-border rounded-xl border border-border bg-muted/40 shadow-sm ring-1 ring-black/[0.02] dark:divide-white/[0.06] dark:border-white/[0.08] dark:bg-[#0a0d14]/40 dark:shadow-none dark:ring-white/[0.04]">
                     {race.pricing.map((row) => (
                       <li
                         key={row.distance}
@@ -684,21 +601,21 @@ export function RaceDetailPage() {
                   </p>
                 </>
               ) : (
-                <p className="rounded-xl border border-white/[0.08] bg-[#0a0d14]/40 px-4 py-4 text-sm leading-relaxed text-muted-foreground ring-1 ring-white/[0.04]">
+                <p className="rounded-xl border border-border bg-muted/50 px-4 py-4 text-sm leading-relaxed text-muted-foreground shadow-sm ring-1 ring-black/[0.02] dark:border-white/[0.08] dark:bg-[#0a0d14]/40 dark:shadow-none dark:ring-white/[0.04]">
                   Not published yet
                 </p>
               )}
             </div>
 
             {!isFestival ? (
-              <div className="mt-6 border-t border-white/[0.06] pt-6">
+              <div className="mt-6 border-t border-border/70 pt-6 dark:border-white/[0.06]">
                 <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
                   {charityTone ? "Mission & atmosphere" : "About"}
                 </h2>
                 <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{race.description}</p>
               </div>
             ) : race.festivalSections && race.festivalSections.length > 0 ? (
-              <div className="mt-6 space-y-8 border-t border-white/[0.06] pt-6">
+              <div className="mt-6 space-y-8 border-t border-border/70 pt-6 dark:border-white/[0.06]">
                 {race.festivalSections.map((section) => (
                   <section key={section.heading}>
                     <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
@@ -741,12 +658,12 @@ export function RaceDetailPage() {
             role="dialog"
             aria-modal="true"
             aria-label="Course map"
-            className="relative max-h-[92vh] max-w-5xl rounded-xl border border-white/[0.12] bg-[#0c1018] p-2 shadow-2xl ring-1 ring-white/[0.06]"
+            className="relative max-h-[92vh] max-w-5xl rounded-xl border border-border bg-card p-2 shadow-2xl ring-1 ring-black/[0.06] dark:border-white/[0.12] dark:bg-[#0c1018] dark:ring-white/[0.06]"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
-              className="absolute right-3 top-3 z-10 flex size-9 items-center justify-center rounded-full border border-white/15 bg-black/65 text-white backdrop-blur-md transition hover:bg-black/85"
+              className="absolute right-3 top-3 z-10 flex size-9 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur-md transition hover:bg-muted dark:border-white/15 dark:bg-black/65 dark:text-white dark:hover:bg-black/85"
               onClick={() => setRouteMapOpen(false)}
               aria-label="Close course map"
             >

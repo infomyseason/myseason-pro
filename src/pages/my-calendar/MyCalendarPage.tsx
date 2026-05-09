@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { computeDaysUntilRace, MOCK_RACE_DETAILS, type MockRaceDetail } from "../../data"
+import { SPORT_STYLES, sportKeyFromLabel, type SportKey } from "../../components/sportTokens"
 import { EUROPE_FLAG_BY_CODE } from "../../data/europeanCountries"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
 import { useUserRaceLists, type CalendarEntry, type CalendarGoalType } from "../../hooks/useUserRaceLists"
@@ -9,6 +10,7 @@ import { Footer } from "../../components/Footer"
 import { HomeNavbar } from "../../components/marketing/HomeNavbar"
 
 type ViewMode = "timeline" | "upcoming" | "month"
+type CalendarGranularity = "monthly" | "yearly"
 
 function parseSegmentKm(distances: string[], segment: "swim" | "bike" | "run"): number | null {
   const re = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*km\s*${segment}`, "i")
@@ -229,6 +231,20 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1)
 }
 
+function buildMonthGrid(forMonth: Date): Date[] {
+  const first = startOfMonth(forMonth)
+  const startWeekday = (first.getDay() + 6) % 7 // Mon=0
+  const gridStart = new Date(first)
+  gridStart.setDate(first.getDate() - startWeekday)
+  const out: Date[] = []
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(gridStart)
+    d.setDate(gridStart.getDate() + i)
+    out.push(d)
+  }
+  return out
+}
+
 function addMonths(d: Date, diff: number): Date {
   return new Date(d.getFullYear(), d.getMonth() + diff, 1)
 }
@@ -238,6 +254,111 @@ function isoDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0")
   const day = String(d.getDate()).padStart(2, "0")
   return `${y}-${m}-${day}`
+}
+
+const WEEKDAY_LABELS_SHORT = ["M", "T", "W", "T", "F", "S", "S"] as const
+const WEEKDAY_LABELS_LONG = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const
+
+function CalendarSportDots({ races, size = "md" }: { races: MockRaceDetail[]; size?: "sm" | "md" }) {
+  const dot = size === "sm" ? "size-1.5" : "size-2"
+  const max = size === "sm" ? 4 : 6
+  const shown = races.slice(0, max)
+  return (
+    <div className="flex min-h-[12px] flex-wrap justify-end gap-0.5">
+      {shown.map((r) => (
+        <span
+          key={r.id}
+          title={`${r.title} (${r.sport})`}
+          className={`${dot} shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/20`}
+          style={{ backgroundColor: SPORT_STYLES[sportKeyFromLabel(r.sport)].hex }}
+        />
+      ))}
+      {races.length > max ? (
+        <span className="self-center text-[9px] font-bold leading-none text-muted-foreground">+{races.length - max}</span>
+      ) : null}
+    </div>
+  )
+}
+
+function MonthMiniGrid({
+  heading,
+  days,
+  anchorMonth,
+  anchorYear,
+  todayIso,
+  racesByIso,
+  compact,
+  onDayPick,
+}: {
+  heading?: string
+  days: Date[]
+  anchorMonth: number
+  anchorYear: number
+  todayIso: string
+  racesByIso: Map<string, MockRaceDetail[]>
+  compact: boolean
+  /** First race opens when multiple share a day. */
+  onDayPick?: (iso: string, races: MockRaceDetail[]) => void
+}) {
+  const labels = compact ? WEEKDAY_LABELS_SHORT : WEEKDAY_LABELS_LONG
+  return (
+    <div className={compact ? "rounded-xl border border-border/40 bg-background/30 p-2 shadow-sm" : ""}>
+      {heading ? (
+        <p className={`font-black text-foreground ${compact ? "mb-1.5 text-center text-[11px] uppercase tracking-wider" : "sr-only"}`}>
+          {heading}
+        </p>
+      ) : null}
+      <div className={`grid grid-cols-7 ${compact ? "gap-0.5 text-[10px]" : "gap-2 text-xs"}`}>
+        {labels.map((d) => (
+          <div key={d} className={`px-0.5 font-bold text-muted-foreground ${compact ? "py-0.5 text-center" : "px-2 py-1"}`}>
+            {d}
+          </div>
+        ))}
+        {days.map((d) => {
+          const dIso = isoDate(d)
+          const inMonth = d.getMonth() === anchorMonth && d.getFullYear() === anchorYear
+          const races = racesByIso.get(dIso) ?? []
+          const isToday = dIso === todayIso
+          const interactive = races.length > 0 && Boolean(onDayPick)
+          return (
+            <div
+              key={dIso}
+              role={interactive ? "button" : undefined}
+              tabIndex={interactive ? 0 : undefined}
+              onClick={() => interactive && onDayPick?.(dIso, races)}
+              onKeyDown={(e) => {
+                if (!interactive) return
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  onDayPick?.(dIso, races)
+                }
+              }}
+              className={`rounded-lg border transition ${
+                compact ? "min-h-[2.125rem] px-0.5 py-0.5" : "min-h-[3.25rem] px-2 py-2"
+              } ${
+                inMonth
+                  ? "border-border/45 bg-background/25"
+                  : "border-border/20 bg-background/10 opacity-[0.72]"
+              } ${races.length > 0 ? "ring-1 ring-primary/25" : ""} ${isToday ? "border-primary/50 ring-1 ring-primary/30" : ""} ${
+                interactive ? "cursor-pointer hover:border-primary/35 hover:bg-background/40" : ""
+              }`}
+            >
+              <div className={`flex items-start justify-between gap-0.5 ${compact ? "" : ""}`}>
+                <span
+                  className={`font-semibold tabular-nums ${inMonth ? "text-foreground" : "text-muted-foreground"} ${
+                    compact ? "text-[10px]" : ""
+                  }`}
+                >
+                  {d.getDate()}
+                </span>
+              </div>
+              {races.length > 0 ? <CalendarSportDots races={races} size={compact ? "sm" : "md"} /> : null}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function dayDiff(aIso: string, bIso: string): number {
@@ -366,27 +487,27 @@ export function MyCalendarPage() {
     return rows
   }, [calendarRaces])
 
-  const monthCursor = useMemo(() => startOfMonth(new Date()), [])
-  const [month, setMonth] = useState<Date>(monthCursor)
+  const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()))
+  const [calendarGranularity, setCalendarGranularity] = useState<CalendarGranularity>("monthly")
 
-  const monthDays = useMemo(() => {
-    const first = startOfMonth(month)
-    const startWeekday = (first.getDay() + 6) % 7 // Mon=0
-    const gridStart = new Date(first)
-    gridStart.setDate(first.getDate() - startWeekday)
-    const out: Date[] = []
-    for (let i = 0; i < 42; i++) {
-      const d = new Date(gridStart)
-      d.setDate(gridStart.getDate() + i)
-      out.push(d)
+  const monthDays = useMemo(() => buildMonthGrid(month), [month])
+
+  const racesByIsoDate = useMemo(() => {
+    const m = new Map<string, MockRaceDetail[]>()
+    for (const r of calendarRaces) {
+      const cur = m.get(r.date)
+      if (cur) cur.push(r)
+      else m.set(r.date, [r])
     }
-    return out
-  }, [month])
+    return m
+  }, [calendarRaces])
 
-  const raceDatesInMonthGrid = useMemo(() => {
-    const s = new Set<string>()
-    for (const r of calendarRaces) s.add(r.date)
-    return s
+  const displayYear = month.getFullYear()
+
+  const sportLegendKeys = useMemo(() => {
+    const s = new Set<SportKey>()
+    for (const r of calendarRaces) s.add(sportKeyFromLabel(r.sport))
+    return [...s]
   }, [calendarRaces])
 
   const onRaceCardClick = (raceId: string) => (e: React.MouseEvent<HTMLElement>) => {
@@ -524,18 +645,18 @@ export function MyCalendarPage() {
         </div>
       ) : null}
 
-      <main className="relative overflow-hidden pb-20 pt-24">
+      <main className="relative overflow-hidden pb-14 pt-20 sm:pb-20 sm:pt-24">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-1/4 top-0 h-[360px] w-[360px] -translate-x-1/2 rounded-full bg-primary/8 blur-[110px]" />
           <div className="absolute bottom-0 right-0 h-[280px] w-[280px] rounded-full bg-[#a855f7]/10 blur-[95px]" />
         </div>
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <header className="mb-8 lg:mb-10">
+          <header className="mb-6 sm:mb-8 lg:mb-10">
             <p className="text-xs font-bold uppercase tracking-wider text-primary/90">Planner</p>
             <div className="mt-2 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
-                <h1 className="text-3xl font-black tracking-tight text-foreground md:text-4xl">My Season Calendar</h1>
+                <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl md:text-4xl">My Season Calendar</h1>
                 <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
                   Plan your races, recovery and build your season.
                 </p>
@@ -543,7 +664,7 @@ export function MyCalendarPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <ViewChip active={view === "month"} onClick={() => setView("month")}>
-                  Month view
+                  Calendar
                 </ViewChip>
                 <ViewChip active={view === "timeline"} onClick={() => setView("timeline")}>
                   Timeline view
@@ -620,7 +741,9 @@ export function MyCalendarPage() {
                     </div>
                     <h2 className="text-lg font-bold text-foreground">Your season is empty</h2>
                     <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                      Add races using <span className="font-semibold text-foreground/90">Add to calendar</span> on any event.
+                      Add races with <span className="font-semibold text-foreground/90">Add to calendar</span> on any event page,
+                      then open <span className="font-semibold text-foreground/90">Edit plan</span> here to choose distance, goals,
+                      and notes.
                     </p>
                     <Link
                       to="/explore"
@@ -713,73 +836,152 @@ export function MyCalendarPage() {
                       ))}
                   </div>
                 ) : view === "month" ? (
-                  <div className="rounded-2xl border border-border/45 bg-background/25 p-5">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black text-foreground">
-                          {month.toLocaleString("en-US", { month: "long", year: "numeric" })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Dates with planned races are highlighted.</p>
+                  <div className="rounded-2xl border border-border/45 bg-background/25 p-4 sm:p-5">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        <ViewChip active={calendarGranularity === "monthly"} onClick={() => setCalendarGranularity("monthly")}>
+                          Monthly
+                        </ViewChip>
+                        <ViewChip active={calendarGranularity === "yearly"} onClick={() => setCalendarGranularity("yearly")}>
+                          Full year
+                        </ViewChip>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setMonth((m) => addMonths(m, -1))}
-                          className="rounded-full border border-border/55 bg-secondary/40 p-2 text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
-                          aria-label="Previous month"
-                        >
-                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
-                            <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMonth(startOfMonth(new Date()))}
-                          className="rounded-full border border-border/55 bg-secondary/40 px-4 py-2 text-xs font-bold uppercase tracking-wide text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
-                        >
-                          Today
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMonth((m) => addMonths(m, 1))}
-                          className="rounded-full border border-border/55 bg-secondary/40 p-2 text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
-                          aria-label="Next month"
-                        >
-                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
-                            <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                          </svg>
-                        </button>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {calendarGranularity === "monthly" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setMonth((m) => addMonths(m, -1))}
+                              className="rounded-full border border-border/55 bg-secondary/40 p-2 text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                              aria-label="Previous month"
+                            >
+                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+                                <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMonth(startOfMonth(new Date()))}
+                              className="rounded-full border border-border/55 bg-secondary/40 px-4 py-2 text-xs font-bold uppercase tracking-wide text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                            >
+                              Today
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMonth((m) => addMonths(m, 1))}
+                              className="rounded-full border border-border/55 bg-secondary/40 p-2 text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                              aria-label="Next month"
+                            >
+                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+                                <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setMonth(new Date(displayYear - 1, month.getMonth(), 1))}
+                              className="rounded-full border border-border/55 bg-secondary/40 p-2 text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                              aria-label="Previous year"
+                            >
+                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+                                <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMonth(startOfMonth(new Date()))}
+                              className="rounded-full border border-border/55 bg-secondary/40 px-4 py-2 text-xs font-bold uppercase tracking-wide text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                            >
+                              This year
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMonth(new Date(displayYear + 1, month.getMonth(), 1))}
+                              className="rounded-full border border-border/55 bg-secondary/40 p-2 text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                              aria-label="Next year"
+                            >
+                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+                                <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-7 gap-2 text-xs">
-                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-                        <div key={d} className="px-2 py-1 font-bold text-muted-foreground">
-                          {d}
-                        </div>
-                      ))}
-                      {monthDays.map((d) => {
-                        const isCurrentMonth = d.getMonth() === month.getMonth()
-                        const dIso = isoDate(d)
-                        const hasRace = raceDatesInMonthGrid.has(dIso)
-                        const isToday = dIso === todayIso
-                        return (
-                          <div
-                            key={dIso}
-                            className={`rounded-xl border px-2 py-2 transition ${
-                              isCurrentMonth ? "border-border/45 bg-background/20" : "border-border/25 bg-background/10 opacity-70"
-                            } ${hasRace ? "ring-1 ring-primary/35" : ""} ${isToday ? "border-primary/40" : ""}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className={`font-semibold ${isCurrentMonth ? "text-foreground" : "text-muted-foreground"}`}>
-                                {d.getDate()}
-                              </span>
-                              {hasRace ? <span className="text-primary">•</span> : null}
-                            </div>
-                          </div>
-                        )
-                      })}
+                    <div className="mb-4">
+                      {calendarGranularity === "monthly" ? (
+                        <>
+                          <p className="text-sm font-black text-foreground">
+                            {month.toLocaleString("en-US", { month: "long", year: "numeric" })}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Coloured dots match sport; tap a day with races to open details.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-black text-foreground">{displayYear}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Twelve months at a glance — dots show planned races by sport colour.
+                          </p>
+                        </>
+                      )}
                     </div>
+
+                    {sportLegendKeys.length > 0 ? (
+                      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border/40 bg-muted/30 px-3 py-2.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Legend</span>
+                        <div className="flex flex-wrap gap-3">
+                          {sportLegendKeys.map((key) => (
+                            <span key={key} className="inline-flex items-center gap-2 text-xs font-semibold text-foreground">
+                              <span
+                                className="size-2.5 shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/20"
+                                style={{ backgroundColor: SPORT_STYLES[key].hex }}
+                              />
+                              {SPORT_STYLES[key].emoji} {SPORT_STYLES[key].label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {calendarGranularity === "monthly" ? (
+                      <MonthMiniGrid
+                        days={monthDays}
+                        anchorMonth={month.getMonth()}
+                        anchorYear={month.getFullYear()}
+                        todayIso={todayIso}
+                        racesByIso={racesByIsoDate}
+                        compact={false}
+                        onDayPick={(_, races) => {
+                          if (races[0]) navigate(`/race/${races[0].id}`)
+                        }}
+                      />
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {Array.from({ length: 12 }, (_, mi) => {
+                          const anchor = new Date(displayYear, mi, 1)
+                          return (
+                            <MonthMiniGrid
+                              key={mi}
+                              heading={anchor.toLocaleString("en-US", { month: "short" })}
+                              days={buildMonthGrid(anchor)}
+                              anchorMonth={mi}
+                              anchorYear={displayYear}
+                              todayIso={todayIso}
+                              racesByIso={racesByIsoDate}
+                              compact
+                              onDayPick={(_, races) => {
+                                if (races[0]) navigate(`/race/${races[0].id}`)
+                              }}
+                            />
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="relative">

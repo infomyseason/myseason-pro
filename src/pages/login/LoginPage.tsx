@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
+import { useAuth } from "../../auth/useAuth"
 import { AuthPageShell } from "../../components/auth/AuthPageShell"
-import { LOGIN_NOTICE_SESSION_KEY } from "../../hooks/mockPasswordReset"
-import { useMockAuth } from "../../hooks/useMockAuth"
+import { LOGIN_NOTICE_SESSION_KEY } from "../../lib/authNotice"
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-border/55 bg-background/90 px-4 py-2.5 text-sm text-foreground outline-none ring-primary/15 placeholder:text-muted-foreground/45 focus:border-primary/40 focus:ring-2"
@@ -10,16 +10,16 @@ const FIELD_CLASS =
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn, login } = useMockAuth()
-  const [identifier, setIdentifier] = useState("")
+  const { isLoggedIn, loading, signInWithPassword } = useAuth()
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (isLoggedIn) navigate("/profile", { replace: true })
-  }, [isLoggedIn, navigate])
+    if (!loading && isLoggedIn) navigate("/profile", { replace: true })
+  }, [isLoggedIn, loading, navigate])
 
   useEffect(() => {
     try {
@@ -39,20 +39,20 @@ export function LoginPage() {
     }
   }, [location.pathname, location.state, navigate])
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const form = e.currentTarget
-    const idEl = form.elements.namedItem("identifier")
+    const emailEl = form.elements.namedItem("email")
     const passEl = form.elements.namedItem("password")
-    const idValue = idEl instanceof HTMLInputElement ? idEl.value.trim() : ""
+    const emailVal = emailEl instanceof HTMLInputElement ? emailEl.value.trim() : ""
     const passValue = passEl instanceof HTMLInputElement ? passEl.value : ""
 
     setError(null)
     setSubmitting(true)
-    const res = login(idValue, passValue)
+    const res = await signInWithPassword(emailVal, passValue)
     setSubmitting(false)
-    if (res.ok === false) {
-      setError(res.error)
+    if (res.error) {
+      setError(res.error.message)
       return
     }
     const from = (location.state as { from?: string } | null)?.from
@@ -67,21 +67,16 @@ export function LoginPage() {
   }
 
   return (
-    <AuthPageShell
-      title="Sign in"
-      subtitle="Mock sign-in — stored on this device only. Use your email or login name."
-    >
+    <AuthPageShell title="Sign in" subtitle="Use your email and password. Sessions stay signed in on this device.">
       <form onSubmit={handleSubmit} className="space-y-5">
         <label className="block">
-          <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Email or login name
-          </span>
+          <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted-foreground">Email</span>
           <input
-            type="text"
-            name="identifier"
+            type="email"
+            name="email"
             autoComplete="username"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className={FIELD_CLASS}
           />
         </label>
@@ -125,7 +120,7 @@ export function LoginPage() {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || loading}
           className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/15 transition hover:bg-primary/90 disabled:opacity-60"
         >
           {submitting ? "Signing in…" : "Sign in"}
