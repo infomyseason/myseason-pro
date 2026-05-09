@@ -1,9 +1,9 @@
-export { Hero } from "./marketing/Hero"
-export { Navbar } from "./marketing/Navbar"
+export { HomeNavbar } from "./marketing/HomeNavbar"
+export { HeroSection } from "./marketing/HeroSection"
 export { LocalRaces } from "./Sections/LocalRaces"
 export { WorldClassEvents } from "./Sections/WorldClassEvents"
 export { SeasonPlannerPreview } from "./Sections/SeasonPlannerPreview"
 export { SportSections } from "./Sections/SportSections"
+export { SportDiscovery } from "./Sections/SportDiscovery"
 export { CommunityRaces } from "./Sections/CommunityRaces"
 export { Footer } from "./Footer"
-

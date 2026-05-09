@@ -1,276 +1,312 @@
+import { useCallback, useEffect, useRef, useState } from "react"
+import { RaceCard } from "../cards/RaceCard"
+import { sportKeyFromLabel } from "../sportTokens"
+
+function featuredScrollStepPx(scrollEl: HTMLDivElement): number {
+  const first = scrollEl.firstElementChild as HTMLElement | undefined
+  if (!first) return 420
+  const style = getComputedStyle(scrollEl)
+  const gapRaw = style.columnGap || style.gap || "20px"
+  const gap = Number.parseFloat(gapRaw) || 20
+  return first.offsetWidth + gap
+}
+
 type FeaturedRace = {
   id: string
   title: string
   city: string
   countryName: string
+  flag: string
   sportType: string
   dateLabel: string
-  participantsLabel: string
+  /** ISO YYYY-MM-DD from official ironman.com structured data */
+  dateIso: string
+  participantsLabel?: string
   distances: string[]
   imageUrl: string
+  officialWebsite: string
+  /** Compact copy aligned with official race themes — original wording */
+  description: string
+  startingPriceLabel?: string
 }
 
+function formatFeaturedDate(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`)
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(d)
+}
+
+function computeDaysUntilFeatured(iso: string): number {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const event = new Date(`${iso}T00:00:00`)
+  event.setHours(0, 0, 0, 0)
+  return Math.ceil((event.getTime() - today.getTime()) / 86400000)
+}
+
+/**
+ * European IRONMAN full-distance events — dates, imagery and URLs from official ironman.com race pages (structured data).
+ */
 const FEATURED_RACES: FeaturedRace[] = [
   {
-    id: "wce-1",
-    title: "Berlin Marathon",
-    city: "Berlin",
+    id: "im-hamburg-european-championship",
+    title: "IRONMAN Hamburg European Championship",
+    city: "Hamburg",
     countryName: "Germany",
-    sportType: "Running",
-    dateLabel: "Sep 28, 2026",
-    participantsLabel: "45,000+",
-    distances: ["Marathon", "WMM"],
-    imageUrl:
-      "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=900&q=80",
-  },
-  {
-    id: "wce-2",
-    title: "Ironman 70.3 Tallinn",
-    city: "Tallinn",
-    countryName: "Estonia",
+    flag: "🇩🇪",
     sportType: "Triathlon",
-    dateLabel: "Aug 9, 2026",
-    participantsLabel: "3,200+",
-    distances: ["70.3", "Middle"],
+    dateIso: "2026-06-07",
+    dateLabel: formatFeaturedDate("2026-06-07"),
+    distances: ["3.8 km swim", "178 km bike", "42.2 km run"],
     imageUrl:
-      "https://images.unsplash.com/photo-1530549387789-4c1017266635?w=900&q=80",
+      "https://www.ironman.com/sites/default/files/styles/og/public/2024-09/imhamburg_eventcard_image1.jpg?h=b086164c&itok=hOyoIZDD",
+    officialWebsite: "https://www.ironman.com/races/im-hamburg",
+    description:
+      "Harbour-city racing through the Alster swim, iconic Hamburg landmarks on two wheels, and a finale along waterways built for bucket-list momentum.",
   },
   {
-    id: "wce-3",
-    title: "HYROX World Championship",
-    city: "Las Vegas",
-    countryName: "United States",
-    sportType: "HYROX",
-    dateLabel: "Jun 14, 2026",
-    participantsLabel: "6,500+",
-    distances: ["Pro", "Doubles"],
-    imageUrl:
-      "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=900&q=80",
-  },
-  {
-    id: "wce-4",
-    title: "Tour de France Stage",
-    city: "Alpe d'Huez",
-    countryName: "France",
-    sportType: "Cycling",
-    dateLabel: "Jul 18, 2026",
-    participantsLabel: "180",
-    distances: ["155K", "HC climb"],
-    imageUrl:
-      "https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=900&q=80",
-  },
-  {
-    id: "wce-5",
-    title: "Challenge Roth",
-    city: "Roth",
+    id: "im-frankfurt-european-championship",
+    title: "IRONMAN Frankfurt European Championship",
+    city: "Frankfurt",
     countryName: "Germany",
+    flag: "🇩🇪",
     sportType: "Triathlon",
-    dateLabel: "Jul 5, 2026",
-    participantsLabel: "5,500+",
-    distances: ["Full", "3.8K swim"],
+    dateIso: "2026-06-28",
+    dateLabel: formatFeaturedDate("2026-06-28"),
+    distances: ["3.8 km swim", "180 km bike", "42.2 km run"],
     imageUrl:
-      "https://images.unsplash.com/photo-1517649763962-0c623066013b?w=900&q=80",
+      "https://www.ironman.com/sites/default/files/styles/og/public/2024-10/IM-Frankfurt_RaceCard_Finish.jpg?h=aae7d1ee&itok=v76LWLS0",
+    officialWebsite: "https://www.ironman.com/races/im-frankfurt",
+    description:
+      "Mainhattan skylines frame Langener Waldsee swimming and a Main river run — a headline European Championship canvas for age-group racing.",
+  },
+  {
+    id: "im-vitoria-gasteiz",
+    title: "IRONMAN Vitoria-Gasteiz",
+    city: "Vitoria-Gasteiz",
+    countryName: "Spain",
+    flag: "🇪🇸",
+    sportType: "Triathlon",
+    dateIso: "2026-07-12",
+    dateLabel: formatFeaturedDate("2026-07-12"),
+    distances: ["3.8 km swim", "180 km bike", "42.2 km run"],
+    imageUrl:
+      "https://www.ironman.com/sites/default/files/styles/og/public/2024-10/IM%20Vitoria-Gasteiz_event%20card.JPG?h=a0d62d26&itok=npTIep8E",
+    officialWebsite: "https://www.ironman.com/races/im-vitoria-gasteiz",
+    description:
+      "Basque Country stadium atmosphere — forested climbs, passionate roadside fans, and a proven proving ground for long-course debuts and qualifiers alike.",
+  },
+  {
+    id: "im-kalmar-sweden",
+    title: "IRONMAN Kalmar",
+    city: "Kalmar",
+    countryName: "Sweden",
+    flag: "🇸🇪",
+    sportType: "Triathlon",
+    dateIso: "2026-08-15",
+    dateLabel: formatFeaturedDate("2026-08-15"),
+    distances: ["3.8 km swim", "180 km bike", "42.2 km run"],
+    imageUrl:
+      "https://www.ironman.com/sites/default/files/styles/og/public/2024-10/im%20kalmar_eventcard.jpg?h=1399bfd2&itok=QCgXhmZL",
+    officialWebsite: "https://www.ironman.com/races/im-kalmar",
+    description:
+      "Kalmar Strait swim starts, the Öland bridge on the bike leg, and Scandinavia’s famously loud finish-line energy — small city, enormous crowd noise.",
+  },
+  {
+    id: "im-copenhagen",
+    title: "IRONMAN Copenhagen",
+    city: "Copenhagen",
+    countryName: "Denmark",
+    flag: "🇩🇰",
+    sportType: "Triathlon",
+    dateIso: "2026-08-16",
+    dateLabel: formatFeaturedDate("2026-08-16"),
+    distances: ["3.8 km swim", "180 km bike", "42.2 km run"],
+    imageUrl:
+      "https://www.ironman.com/sites/default/files/styles/og/public/2024-10/IM_Copenhagen_eventcard_Nyhavn.jpg?h=d1cb525d&itok=vXygzkVN",
+    officialWebsite: "https://www.ironman.com/races/im-copenhagen",
+    description:
+      "Capital-city racing with Baltic bay swimming, rolling North Zealand riding, and a flat urban run past Danish landmarks — Nordic cheer everywhere.",
+  },
+  {
+    id: "im-wales",
+    title: "IRONMAN Wales",
+    city: "Tenby",
+    countryName: "United Kingdom",
+    flag: "🇬🇧",
+    sportType: "Triathlon",
+    dateIso: "2026-09-13",
+    dateLabel: formatFeaturedDate("2026-09-13"),
+    distances: ["3.8 km swim", "180 km bike", "42.2 km run"],
+    imageUrl:
+      "https://www.ironman.com/sites/default/files/styles/og/public/2024-09/imwales_eventcard_image1.png?h=d1cb525d&itok=KzowB77u",
+    officialWebsite: "https://www.ironman.com/races/im-wales",
+    description:
+      "North Beach sunrise swims, Pembrokeshire coastal riding, and Tenby’s fortress-like spectator gauntlet — legendary British long-course theatre.",
+  },
+  {
+    id: "im-emilia-romagna",
+    title: "IRONMAN Italy Emilia-Romagna",
+    city: "Cervia",
+    countryName: "Italy",
+    flag: "🇮🇹",
+    sportType: "Triathlon",
+    dateIso: "2026-09-19",
+    dateLabel: formatFeaturedDate("2026-09-19"),
+    distances: ["3.8 km swim", "180 km bike", "42.2 km run"],
+    imageUrl:
+      "https://www.ironman.com/sites/default/files/styles/og/public/2024-09/IM-Italy-event-card.jpg?h=b6717701&itok=WAKuOkX6",
+    officialWebsite: "https://www.ironman.com/races/im-emilia-romagna",
+    description:
+      "Adriatic-edge racing from historic Cervia — Mediterranean calm on the swim, Romagna countryside tempo on the bike, seaside runway into town.",
+  },
+  {
+    id: "im-calella-barcelona",
+    title: "IRONMAN Calella-Barcelona",
+    city: "Calella",
+    countryName: "Spain",
+    flag: "🇪🇸",
+    sportType: "Triathlon",
+    dateIso: "2026-10-04",
+    dateLabel: formatFeaturedDate("2026-10-04"),
+    distances: ["3.8 km swim", "180 km bike", "42.2 km run"],
+    imageUrl:
+      "https://www.ironman.com/sites/default/files/styles/og/public/2024-09/IMBarcelona_eventcard.jpg?h=b6717701&itok=Wc_q30pi",
+    officialWebsite: "https://www.ironman.com/races/im-barcelona",
+    description:
+      "Maresme coastal kilometres, fast autumn pacing, and a beach-close finish — a favourite European season closer drenched in Catalan sunshine.",
   },
 ]
 
-function sportBadgeClass(sport: string) {
-  const s = sport.toLowerCase()
-  if (s === "running")
-    return "border-emerald-400/35 bg-emerald-500/20 text-emerald-100"
-  if (s === "triathlon")
-    return "border-violet-400/35 bg-violet-500/20 text-violet-100"
-  if (s === "hyrox")
-    return "border-orange-400/35 bg-orange-500/20 text-orange-100"
-  if (s === "cycling")
-    return "border-sky-400/35 bg-sky-500/20 text-sky-100"
-  return "border-[#f6d7b0]/35 bg-[#f6d7b0]/15 text-[#f6d7b0]"
-}
-
 export function WorldClassEvents() {
+  const stripRef = useRef<HTMLDivElement>(null)
+  const [featuredPaused, setFeaturedPaused] = useState(false)
+  const scrollFeaturedNextRef = useRef<() => void>(() => {})
+
+  const scrollFeaturedPrev = useCallback(() => {
+    const el = stripRef.current
+    if (!el) return
+    const step = featuredScrollStepPx(el)
+    const maxScroll = el.scrollWidth - el.clientWidth
+    const atStart = el.scrollLeft <= 2
+    if (atStart) {
+      el.scrollTo({ left: maxScroll, behavior: "smooth" })
+    } else {
+      el.scrollBy({ left: -step, behavior: "smooth" })
+    }
+  }, [])
+
+  const scrollFeaturedNext = useCallback(() => {
+    const el = stripRef.current
+    if (!el) return
+    const step = featuredScrollStepPx(el)
+    const maxScroll = el.scrollWidth - el.clientWidth
+    const atEnd = el.scrollLeft >= maxScroll - 2
+    if (atEnd) {
+      el.scrollTo({ left: 0, behavior: "smooth" })
+    } else {
+      el.scrollBy({ left: step, behavior: "smooth" })
+    }
+  }, [])
+
+  scrollFeaturedNextRef.current = scrollFeaturedNext
+
+  useEffect(() => {
+    if (FEATURED_RACES.length <= 1) return
+    if (featuredPaused) return
+    const id = window.setInterval(() => scrollFeaturedNextRef.current(), 3000)
+    return () => window.clearInterval(id)
+  }, [featuredPaused])
+
   return (
-    <section className="border-t border-white/[0.10] bg-transparent py-12 shadow-[inset_0_1px_0_rgba(255,255,255,0.034)] sm:py-16 lg:py-20">
-      <div className="mx-auto max-w-7xl px-3 sm:px-6">
-        <div className="mb-7 flex flex-col gap-3 sm:mb-10 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-          <div className="min-w-0">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#f6d7b0]/30 bg-[#f6d7b0]/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-[#f6d7b0]">
-              <span className="text-base leading-none" aria-hidden="true">
+    <section className="relative overflow-hidden border-t border-border/30 py-16 md:py-20">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute left-0 top-0 h-[400px] w-[400px] rounded-full bg-[#a855f7]/5 blur-[100px]" />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+              <span className="text-[10px]" aria-hidden="true">
                 ◆
               </span>
               Featured Events
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl lg:text-[2.75rem] lg:leading-[1.06]">
-              World-class events
-            </h2>
-            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-slate-400 sm:text-base">
-              The races that define champions
+            <h2 className="text-3xl font-black text-foreground md:text-5xl">World-class events</h2>
+            <p className="mt-2 text-base text-muted-foreground md:text-lg">
+              Official IRONMAN full-distance racing across Europe
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              tabIndex={-1}
-              aria-hidden="true"
-              className="pointer-events-none hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur sm:inline-flex sm:h-11 sm:w-11"
+              aria-label="Scroll to previous events"
+              aria-controls="world-class-events-strip"
+              onClick={scrollFeaturedPrev}
+              className="rounded-full border border-border/50 bg-secondary/50 p-2.5 text-foreground backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-secondary disabled:pointer-events-none disabled:opacity-35"
             >
-              <svg
-                viewBox="0 0 24 24"
-                width="18"
-                height="18"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <path
-                  d="M15 6l-6 6 6 6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </button>
             <button
               type="button"
-              tabIndex={-1}
-              aria-hidden="true"
-              className="pointer-events-none hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur sm:inline-flex sm:h-11 sm:w-11"
+              aria-label="Scroll to next events"
+              aria-controls="world-class-events-strip"
+              onClick={scrollFeaturedNext}
+              className="rounded-full border border-border/50 bg-secondary/50 p-2.5 text-foreground backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-secondary disabled:pointer-events-none disabled:opacity-35"
             >
-              <svg
-                viewBox="0 0 24 24"
-                width="18"
-                height="18"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <path
-                  d="M9 6l6 6-6 6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+                <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </button>
             <a
-              href="#"
-              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-[13px] font-semibold text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-[#f6d7b0]/40 hover:bg-[#f6d7b0]/10 hover:text-[#f6d7b0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f6d7b0]/55 sm:min-h-[2.75rem] sm:text-sm"
+              href="https://www.ironman.com/races?facet%5B0%5D=race%3AIRONMAN&facet%5B1%5D=region%3AEurope"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80"
             >
-              View all
-              <svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                className="ml-2"
-                aria-hidden="true"
-              >
-                <path
-                  d="M9 6l6 6-6 6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+              IRONMAN Europe
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+                <path d="M14 3h7v7M10 14 21 3M21 3v7h-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </a>
           </div>
         </div>
 
-        <div className="relative -mx-3 sm:-mx-6">
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-20 w-12 bg-gradient-to-r from-[#030712] via-[#030712]/85 to-transparent sm:w-16 md:w-20" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-12 bg-gradient-to-l from-[#030712] via-[#030712]/85 to-transparent sm:w-16 md:w-20" />
-
-          <div className="flex snap-x snap-mandatory gap-3.5 overflow-x-auto overscroll-x-contain scroll-smooth px-3 pb-4 pt-1 [-webkit-overflow-scrolling:touch] scroll-pl-3 scroll-pr-3 [overscroll-behavior-x:contain] [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-7 sm:px-6 sm:pb-5 sm:scroll-pl-6 sm:scroll-pr-6 [&::-webkit-scrollbar]:hidden touch-pan-x">
+        <div
+          className="relative"
+          onMouseEnter={() => setFeaturedPaused(true)}
+          onMouseLeave={() => setFeaturedPaused(false)}
+        >
+          <div
+            ref={stripRef}
+            id="world-class-events-strip"
+            role="region"
+            aria-label="World-class event cards"
+            className="-mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain px-4 pb-4 scrollbar-hide [scrollbar-width:none] [-ms-overflow-style:none]"
+          >
             {FEATURED_RACES.map((race) => (
-              <article
-                key={race.id}
-                className="group relative w-[min(calc(100vw-3.25rem),296px)] shrink-0 snap-start snap-always overflow-hidden rounded-2xl border border-white/10 bg-[#0b1220] shadow-[0_28px_84px_-46px_rgba(0,0,0,0.96)] ring-1 ring-white/[0.04] transition hover:border-[#f6d7b0]/28 hover:shadow-[0_34px_96px_-44px_rgba(246,215,176,0.18)] sm:w-[340px] md:w-[472px] lg:w-[508px]"
-              >
-                <div className="relative aspect-[16/9] overflow-hidden">
-                  <img
-                    src={race.imageUrl}
-                    alt=""
-                    className="h-full w-full object-cover brightness-[0.97] contrast-[1.03] saturate-[1.05] transition duration-700 ease-out will-change-transform group-hover:scale-[1.04]"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#030712]/95 via-[#030712]/58 to-transparent" />
-                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30)_0%,rgba(0,0,0,0)_48%)]" />
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_14%,rgba(246,215,176,0.09),transparent_52%)]" />
-
-                  <div className="absolute left-3 top-3 z-[1] flex flex-wrap gap-2">
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${sportBadgeClass(race.sportType)}`}
-                    >
-                      {race.sportType}
-                    </span>
-                    <span className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-100">
-                      Major
-                    </span>
-                  </div>
-
-                  <div className="absolute inset-x-0 bottom-0 z-[1] p-3 sm:p-4">
-                    <div className="flex flex-wrap gap-1.5 pb-2">
-                      {race.distances.map((d) => (
-                        <span
-                          key={d}
-                          className="rounded-full border border-white/12 bg-black/35 px-2.5 py-1 text-[11px] font-semibold text-slate-100 backdrop-blur-md"
-                        >
-                          {d}
-                        </span>
-                      ))}
-                    </div>
-
-                    <h3 className="text-[15px] font-extrabold leading-snug tracking-tight text-white sm:text-lg lg:text-xl">
-                      {race.title}
-                    </h3>
-
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-200/85">
-                      <span>
-                        {race.city}, {race.countryName}
-                      </span>
-                      <span className="hidden h-3 w-px bg-white/15 sm:inline" aria-hidden="true" />
-                      <span className="inline-flex items-center gap-1.5">
-                        <svg
-                          viewBox="0 0 24 24"
-                          width="14"
-                          height="14"
-                          fill="none"
-                          className="text-[#f6d7b0]/85"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-                            stroke="currentColor"
-                            strokeWidth="1.75"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        {race.dateLabel}
-                      </span>
-                      <span className="hidden h-3 w-px bg-white/15 sm:inline" aria-hidden="true" />
-                      <span className="inline-flex items-center gap-1.5">
-                        <svg
-                          viewBox="0 0 24 24"
-                          width="14"
-                          height="14"
-                          fill="none"
-                          className="text-[#f6d7b0]/85"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
-                            stroke="currentColor"
-                            strokeWidth="1.75"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        {race.participantsLabel} athletes
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </article>
+              <div key={race.id} className="relative">
+                <RaceCard
+                  mode="featured"
+                  sportKey={sportKeyFromLabel(race.sportType)}
+                  title={race.title}
+                  locationLine={`${race.city}, ${race.countryName}`}
+                  flag={race.flag}
+                  dateLabel={race.dateLabel}
+                  imageUrl={race.imageUrl}
+                  distances={race.distances}
+                  daysUntil={computeDaysUntilFeatured(race.dateIso)}
+                  major
+                  athletesLabel={race.participantsLabel}
+                  extraBadge="Ironman"
+                  featuredBlurb={race.description}
+                  to={`/race/${race.id}`}
+                  startingPriceLabel={race.startingPriceLabel}
+                />
+              </div>
             ))}
           </div>
         </div>
