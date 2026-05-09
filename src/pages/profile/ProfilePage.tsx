@@ -35,7 +35,7 @@ function homepagePriceLabel(label?: string): string | undefined {
 const TABS = [
   { id: "favourites" as const, label: "Favourites" },
   { id: "calendar" as const, label: "Calendar" },
-  { id: "submissions" as const, label: "Submissions" },
+  { id: "submissions" as const, label: "My submissions" },
   { id: "completed" as const, label: "Completed" },
   { id: "stats" as const, label: "Stats" },
 ]
@@ -301,6 +301,8 @@ export function ProfilePage() {
                             daysUntil={race.daysUntil}
                             to={`/race/${race.id}`}
                             startingPriceLabel={homepagePriceLabel(race.startingPriceLabel)}
+                            registrationStatus={race.registrationStatus}
+                            priceNote={race.priceNote}
                           />
                           <button
                             type="button"
@@ -427,6 +429,12 @@ export function ProfilePage() {
                                 View
                               </Link>
                             ) : null}
+                            <Link
+                              to={`/add-race?edit=${encodeURIComponent(s.id)}`}
+                              className="rounded-full border border-primary/30 bg-primary/12 px-4 py-2 text-xs font-semibold text-primary transition hover:border-primary/55 hover:bg-primary/[0.16]"
+                            >
+                              Edit
+                            </Link>
                           </div>
                         </div>
                       ))}

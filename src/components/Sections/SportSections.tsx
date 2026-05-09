@@ -126,6 +126,8 @@ export function SportSections() {
                       distances={race.distances}
                       daysUntil={computeDaysUntilRace(race.date)}
                       to={`/race/${race.id}`}
+                    registrationStatus={race.registrationStatus}
+                    priceNote={race.priceNote}
                     />
                   ))}
                 </div>

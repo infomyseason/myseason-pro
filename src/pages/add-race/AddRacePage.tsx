@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useMockAuth } from "../../hooks/useMockAuth"
-import { useRaceSubmissions, type RaceSubmissionType } from "../../hooks/useRaceSubmissions"
+import { useRaceSubmissions, type RaceSubmissionType, type RegistrationStatus } from "../../hooks/useRaceSubmissions"
 import { Footer } from "../../components/Footer"
 import { HomeNavbar } from "../../components/marketing/HomeNavbar"
 
@@ -27,8 +27,14 @@ function TypeChip({ active, children, onClick }: { active: boolean; children: Re
 }
 
 export function AddRacePage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { isLoggedIn, user } = useMockAuth()
-  const { submit, isAdmin } = useRaceSubmissions()
+  const { submit, isAdmin, submissions, canEdit, updateAsCurrentUser } = useRaceSubmissions()
+
+  const editId = searchParams.get("edit")
+  const editingSubmission = useMemo(() => (editId ? submissions.find((s) => s.id === editId) ?? null : null), [editId, submissions])
+  const isEditMode = Boolean(editId)
 
   const [type, setType] = useState<RaceSubmissionType>("community_race")
   const [title, setTitle] = useState("")
@@ -46,10 +52,41 @@ export function AddRacePage() {
   const [organizer, setOrganizer] = useState("")
   const [estimatedParticipants, setEstimatedParticipants] = useState("")
   const [entryFee, setEntryFee] = useState("")
+  const [registrationStatus, setRegistrationStatus] = useState<RegistrationStatus | "">("")
+  const [priceNote, setPriceNote] = useState("")
+  const [priceLastUpdatedAt, setPriceLastUpdatedAt] = useState("")
+  const [lastCheckedAt, setLastCheckedAt] = useState("")
   const [routeUrl, setRouteUrl] = useState("")
   const [notes, setNotes] = useState("")
 
   const [resultMsg, setResultMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isEditMode) return
+    if (!editingSubmission) return
+    setType(editingSubmission.type)
+    setTitle(editingSubmission.title)
+    setSport(editingSubmission.sport)
+    setCountry(editingSubmission.country)
+    setCountryCode(editingSubmission.countryCode ?? "")
+    setCity(editingSubmission.city)
+    setVenueLine(editingSubmission.venueLine ?? "")
+    setDate(editingSubmission.date)
+    setTime(editingSubmission.time ?? "")
+    setDistances(editingSubmission.distances ?? "")
+    setDescription(editingSubmission.description ?? "")
+    setWebsiteUrl(editingSubmission.websiteUrl ?? "")
+    setImageUrl(editingSubmission.imageUrl ?? "")
+    setOrganizer(editingSubmission.organizer ?? "")
+    setEstimatedParticipants(editingSubmission.estimatedParticipants != null ? String(editingSubmission.estimatedParticipants) : "")
+    setEntryFee(editingSubmission.entryFee ?? "")
+    setRegistrationStatus((editingSubmission.registrationStatus ?? "") as any)
+    setPriceNote(editingSubmission.priceNote ?? "")
+    setPriceLastUpdatedAt(editingSubmission.priceLastUpdatedAt ?? "")
+    setLastCheckedAt(editingSubmission.lastCheckedAt ?? "")
+    setRouteUrl(editingSubmission.routeUrl ?? "")
+    setNotes(editingSubmission.notes ?? "")
+  }, [editingSubmission, isEditMode])
 
   const typeHint = useMemo(() => {
     if (type === "official_race") return "Official race submissions require admin approval before being public."
@@ -59,7 +96,7 @@ export function AddRacePage() {
 
   const onSubmit = () => {
     setResultMsg(null)
-    const res = submit({
+    const payload = {
       type,
       title,
       sport,
@@ -76,35 +113,39 @@ export function AddRacePage() {
       organizer: organizer.trim() || undefined,
       estimatedParticipants: estimatedParticipants.trim() ? Number(estimatedParticipants) : undefined,
       entryFee: entryFee.trim() || undefined,
+      registrationStatus: registrationStatus || undefined,
+      priceNote: priceNote.trim() || undefined,
+      priceLastUpdatedAt: priceLastUpdatedAt.trim() || undefined,
+      lastCheckedAt: lastCheckedAt.trim() || undefined,
       routeUrl: routeUrl.trim() || undefined,
       notes: notes.trim() || undefined,
-    })
+    } as const
+
+    if (isEditMode) {
+      if (!editingSubmission) {
+        setResultMsg("Submission not found.")
+        return
+      }
+      if (!canEdit(editingSubmission)) {
+        setResultMsg("You don't have permission to edit this submission.")
+        return
+      }
+      const res = updateAsCurrentUser(editingSubmission.id, payload, "Edited submission")
+      if (!res.ok) {
+        setResultMsg(res.error)
+        return
+      }
+      setResultMsg("Updated.")
+      navigate(`/profile`, { replace: true })
+      return
+    }
+
+    const res = submit(payload as any)
     if (!res.ok) {
       setResultMsg(res.error)
       return
     }
-    setTitle("")
-    setCountry("")
-    setCountryCode("")
-    setCity("")
-    setVenueLine("")
-    setDate("")
-    setTime("")
-    setDistances("")
-    setDescription("")
-    setWebsiteUrl("")
-    setImageUrl("")
-    setOrganizer("")
-    setEstimatedParticipants("")
-    setEntryFee("")
-    setRouteUrl("")
-    setNotes("")
-
-    setResultMsg(
-      res.submission.status === "pending"
-        ? "Submitted. Waiting for admin approval."
-        : "Submitted. Your event is now visible.",
-    )
+    setResultMsg(res.submission.status === "pending" ? "Submitted. Waiting for admin approval." : "Submitted. Your event is now visible.")
   }
 
   return (
@@ -114,7 +155,7 @@ export function AddRacePage() {
       <main className="relative overflow-hidden pb-20 pt-24">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-1/4 top-0 h-[360px] w-[360px] -translate-x-1/2 rounded-full bg-primary/8 blur-[110px]" />
-          <div className="absolute bottom-0 right-0 h-[280px] w-[280px] rounded-full bg-[#22c55e]/10 blur-[95px]" />
+          <div className="absolute bottom-0 right-0 h-[280px] w-[280px] rounded-full bg-[#3b82f6]/10 blur-[95px]" />
         </div>
 
         <div className="relative z-10 mx-auto max-w-3xl px-4 sm:px-6">
@@ -146,6 +187,11 @@ export function AddRacePage() {
                     <p className="mt-1 text-xs text-muted-foreground">{typeHint}</p>
                     {isAdmin ? (
                       <p className="mt-2 text-xs font-semibold text-primary">Admin mode enabled for {user?.email}</p>
+                    ) : null}
+                    {isEditMode && editingSubmission ? (
+                      <p className="mt-2 text-xs font-semibold text-muted-foreground">
+                        Editing submission · status: <span className="text-primary">{editingSubmission.status}</span>
+                      </p>
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -272,6 +318,38 @@ export function AddRacePage() {
                     <div className="sm:col-span-2">
                       <label className={LABEL_CLASS}>Price / entry fee (optional)</label>
                       <input value={entryFee} onChange={(e) => setEntryFee(e.target.value)} className={FIELD_CLASS} placeholder="from €35" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={LABEL_CLASS}>Registration status (optional)</label>
+                      <select
+                        value={registrationStatus}
+                        onChange={(e) => setRegistrationStatus(e.target.value as any)}
+                        className={FIELD_CLASS}
+                      >
+                        <option value="">Not set</option>
+                        <option value="open">Open for registration</option>
+                        <option value="closingSoon">Closing soon</option>
+                        <option value="soldOut">Sold out</option>
+                        <option value="notOpenYet">Registration not open yet</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className={LABEL_CLASS}>Price note (optional)</label>
+                      <input
+                        value={priceNote}
+                        onChange={(e) => setPriceNote(e.target.value)}
+                        className={FIELD_CLASS}
+                        placeholder="Early bird until May 20 · limited spots"
+                      />
+                    </div>
+                    <div>
+                      <label className={LABEL_CLASS}>Price last updated (optional)</label>
+                      <input type="date" value={priceLastUpdatedAt} onChange={(e) => setPriceLastUpdatedAt(e.target.value)} className={FIELD_CLASS} />
+                    </div>
+                    <div>
+                      <label className={LABEL_CLASS}>Last checked (optional)</label>
+                      <input type="date" value={lastCheckedAt} onChange={(e) => setLastCheckedAt(e.target.value)} className={FIELD_CLASS} />
                     </div>
                   </div>
                 </details>

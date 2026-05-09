@@ -103,7 +103,7 @@ export function HeroSection() {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 top-1/4 h-[600px] w-[600px] animate-pulse rounded-full bg-primary/10 blur-[120px]" />
         <div
-          className="absolute -right-32 bottom-1/4 h-[600px] w-[600px] rounded-full bg-[#22c55e]/10 blur-[120px]"
+          className="absolute -right-32 bottom-1/4 h-[600px] w-[600px] rounded-full bg-[#3b82f6]/10 blur-[120px]"
           style={{ animationDelay: "1s" }}
         />
         <div className="absolute left-1/2 top-1/2 h-[900px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#3b82f6]/5 blur-[150px]" />
@@ -128,8 +128,8 @@ export function HeroSection() {
             </g>
           </svg>
         </div>
-        <div className="absolute right-[15%] top-20 h-40 w-1 rotate-12 rounded-full bg-gradient-to-b from-[#22c55e]/30 to-transparent" />
-        <div className="absolute right-[12%] top-32 h-28 w-0.5 rotate-12 rounded-full bg-gradient-to-b from-[#22c55e]/20 to-transparent" />
+        <div className="absolute right-[15%] top-20 h-40 w-1 rotate-12 rounded-full bg-gradient-to-b from-[#3b82f6]/28 to-transparent" />
+        <div className="absolute right-[12%] top-32 h-28 w-0.5 rotate-12 rounded-full bg-gradient-to-b from-[#3b82f6]/18 to-transparent" />
         <div className="absolute bottom-40 left-[10%] h-32 w-1 -rotate-12 rounded-full bg-gradient-to-b from-[#3b82f6]/30 to-transparent" />
         <div className="absolute bottom-48 left-[13%] h-24 w-0.5 -rotate-12 rounded-full bg-gradient-to-b from-[#3b82f6]/20 to-transparent" />
         <div className="absolute right-[8%] top-[35%] h-20 w-0.5 rotate-45 rounded-full bg-gradient-to-b from-[#a855f7]/25 to-transparent" />
@@ -187,7 +187,7 @@ export function HeroSection() {
           }}
         >
           <div className="group relative">
-            <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-primary/40 via-[#22c55e]/30 to-[#3b82f6]/40 opacity-0 blur-xl transition-all duration-500 group-hover:opacity-50 group-focus-within:opacity-40" />
+            <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-primary/40 via-[#3b82f6]/30 to-[#a855f7]/35 opacity-0 blur-xl transition-all duration-500 group-hover:opacity-50 group-focus-within:opacity-40" />
             <div className="relative">
               <svg
                 viewBox="0 0 24 24"
@@ -225,7 +225,7 @@ export function HeroSection() {
               key={item.title}
               type="button"
               onClick={() => onFeatureClick(item.action)}
-              className="flex cursor-pointer flex-col rounded-2xl border border-white/[0.09] bg-[#0a0d14]/55 px-5 py-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-primary/[0.07] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:ring-primary/18 hover:shadow-[0_18px_48px_-28px_rgba(232,200,150,0.35)] active:translate-y-0 md:px-6 md:py-6"
+              className="flex cursor-pointer flex-col rounded-2xl border border-border/55 bg-card/55 px-5 py-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-primary/[0.06] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/25 hover:ring-primary/18 hover:shadow-[0_18px_48px_-28px_rgba(59,130,246,0.22)] active:translate-y-0 md:px-6 md:py-6"
             >
               <div className="mb-4 flex size-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/[0.07] shadow-[0_0_24px_-12px_rgba(232,200,150,0.5)]">
                 <HighlightIcon name={item.icon} />

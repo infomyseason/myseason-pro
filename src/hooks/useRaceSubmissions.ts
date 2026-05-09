@@ -4,6 +4,14 @@ import { notifyUserDataChanged, USER_DATA_CHANGED_EVENT } from "./userScopedStor
 
 export type RaceSubmissionType = "official_race" | "community_race" | "community_event"
 export type RaceSubmissionStatus = "pending" | "approved" | "rejected"
+export type RegistrationStatus = "open" | "closingSoon" | "soldOut" | "notOpenYet" | "cancelled"
+
+export type SubmissionEditHistoryEntry = {
+  at: string // ISO
+  byUserId: string
+  byName: string
+  note?: string
+}
 
 export type RaceSubmission = {
   id: string
@@ -11,6 +19,8 @@ export type RaceSubmission = {
   updatedAt: string // ISO
   createdByUserId: string
   createdByEmail: string
+  createdByName: string
+  updatedByUserId?: string
   status: RaceSubmissionStatus
   type: RaceSubmissionType
 
@@ -29,9 +39,14 @@ export type RaceSubmission = {
   organizer?: string
   estimatedParticipants?: number
   entryFee?: string
+  registrationStatus?: RegistrationStatus
+  priceLastUpdatedAt?: string
+  lastCheckedAt?: string
+  priceNote?: string
   routeUrl?: string
   notes?: string
   adminNote?: string
+  editHistory?: SubmissionEditHistoryEntry[]
 }
 
 export const RACE_SUBMISSIONS_STORAGE_KEY = "myseason_race_submissions_v1"
@@ -71,6 +86,8 @@ function coerceSubmission(row: unknown): RaceSubmission | null {
   const updatedAt = readString(r.updatedAt)
   const createdByUserId = readString(r.createdByUserId)
   const createdByEmail = readString(r.createdByEmail)
+  const createdByName = readString(r.createdByName) ?? "User"
+  const updatedByUserId = readString(r.updatedByUserId)
   const status = readString(r.status) as RaceSubmissionStatus | undefined
   const type = readString(r.type) as RaceSubmissionType | undefined
 
@@ -79,11 +96,17 @@ function coerceSubmission(row: unknown): RaceSubmission | null {
   const country = readString(r.country)
   const city = readString(r.city)
   const date = readString(r.date)
+  const registrationStatus = readString(r.registrationStatus) as RegistrationStatus | undefined
 
   if (!id || !createdAt || !updatedAt || !createdByUserId || !createdByEmail) return null
   if (!status || !type || !title || !sport || !country || !city || !date) return null
   if (!["pending", "approved", "rejected"].includes(status)) return null
   if (!["official_race", "community_race", "community_event"].includes(type)) return null
+  if (
+    registrationStatus &&
+    !["open", "closingSoon", "soldOut", "notOpenYet", "cancelled"].includes(registrationStatus)
+  )
+    return null
 
   return {
     id,
@@ -91,6 +114,8 @@ function coerceSubmission(row: unknown): RaceSubmission | null {
     updatedAt,
     createdByUserId,
     createdByEmail,
+    createdByName,
+    updatedByUserId,
     status,
     type,
     title,
@@ -108,9 +133,27 @@ function coerceSubmission(row: unknown): RaceSubmission | null {
     organizer: readString(r.organizer),
     estimatedParticipants: readNumber(r.estimatedParticipants),
     entryFee: readString(r.entryFee),
+    registrationStatus,
+    priceLastUpdatedAt: readString(r.priceLastUpdatedAt),
+    lastCheckedAt: readString(r.lastCheckedAt),
+    priceNote: readString(r.priceNote),
     routeUrl: readString(r.routeUrl),
     notes: readString(r.notes),
     adminNote: readString(r.adminNote),
+    editHistory: Array.isArray(r.editHistory)
+      ? (r.editHistory
+          .map((row) => {
+            if (typeof row !== "object" || row === null) return null
+            const rr = row as Record<string, unknown>
+            const at = readString(rr.at)
+            const byUserId = readString(rr.byUserId)
+            const byName = readString(rr.byName)
+            if (!at || !byUserId || byName == null) return null
+            const note = readString(rr.note)
+            return { at, byUserId, byName, ...(note?.trim() ? { note } : {}) }
+          })
+          .filter((x): x is SubmissionEditHistoryEntry => Boolean(x)) as SubmissionEditHistoryEntry[])
+      : undefined,
   }
 }
 
@@ -141,7 +184,8 @@ export function useRaceSubmissions(): {
     ok: true
     submission: RaceSubmission
   } | { ok: false; error: string }
-  update: (id: string, patch: Partial<RaceSubmission>) => void
+  canEdit: (s: RaceSubmission) => boolean
+  updateAsCurrentUser: (id: string, patch: Partial<RaceSubmission>, note?: string) => { ok: true } | { ok: false; error: string }
   remove: (id: string) => void
   approve: (id: string) => void
   reject: (id: string, adminNote?: string) => void
@@ -170,9 +214,7 @@ export function useRaceSubmissions(): {
   const isAdmin = useMemo(() => isAdminEmail(user?.email), [user?.email])
 
   const submit = useCallback(
-    (
-      input: Omit<RaceSubmission, "id" | "createdAt" | "updatedAt" | "createdByUserId" | "createdByEmail" | "status">,
-    ) => {
+    (input: Omit<RaceSubmission, "id" | "createdAt" | "updatedAt" | "createdByUserId" | "createdByEmail" | "createdByName" | "status">) => {
       if (!userId || !user) return { ok: false as const, error: "You must be logged in to submit." }
       const title = input.title.trim()
       const country = input.country.trim()
@@ -189,6 +231,8 @@ export function useRaceSubmissions(): {
         updatedAt: nowIso(),
         createdByUserId: user.id,
         createdByEmail: user.email,
+        createdByName: user.displayName,
+        updatedByUserId: user.id,
         status,
         ...input,
         title,
@@ -205,11 +249,54 @@ export function useRaceSubmissions(): {
     [user, userId],
   )
 
-  const update = useCallback((id: string, patch: Partial<RaceSubmission>) => {
-    const next = loadRaceSubmissions().map((s) => (s.id === id ? { ...s, ...patch, updatedAt: nowIso() } : s))
-    saveRaceSubmissions(next)
-    setSubmissionsState(next)
-  }, [])
+  const canEdit = useCallback(
+    (s: RaceSubmission) => {
+      if (!userId || !user) return false
+      if (isAdminEmail(user.email)) return true
+      return s.createdByUserId === userId
+    },
+    [user, userId],
+  )
+
+  const updateAsCurrentUser = useCallback(
+    (id: string, patch: Partial<RaceSubmission>, note?: string) => {
+      if (!userId || !user) return { ok: false as const, error: "You must be logged in to edit." }
+      const all = loadRaceSubmissions()
+      const current = all.find((s) => s.id === id)
+      if (!current) return { ok: false as const, error: "Submission not found." }
+      if (!canEdit(current)) return { ok: false as const, error: "You don't have permission to edit this submission." }
+
+      const isAdminActor = isAdminEmail(user.email)
+      let nextStatus = current.status
+
+      // Approval rule: creator editing an approved official race -> back to pending.
+      if (!isAdminActor && current.type === "official_race" && current.status === "approved") {
+        nextStatus = "pending"
+      }
+
+      const historyEntry: SubmissionEditHistoryEntry = {
+        at: nowIso(),
+        byUserId: user.id,
+        byName: user.displayName,
+        ...(note?.trim() ? { note: note.trim() } : {}),
+      }
+
+      const merged: RaceSubmission = {
+        ...current,
+        ...patch,
+        status: patch.status ?? nextStatus,
+        updatedAt: nowIso(),
+        updatedByUserId: user.id,
+        editHistory: [...(current.editHistory ?? []), historyEntry],
+      }
+
+      const next = all.map((s) => (s.id === id ? merged : s))
+      saveRaceSubmissions(next)
+      setSubmissionsState(next)
+      return { ok: true as const }
+    },
+    [canEdit, user, userId],
+  )
 
   const remove = useCallback((id: string) => {
     const next = loadRaceSubmissions().filter((s) => s.id !== id)
@@ -217,9 +304,44 @@ export function useRaceSubmissions(): {
     setSubmissionsState(next)
   }, [])
 
-  const approve = useCallback((id: string) => update(id, { status: "approved" }), [update])
-  const reject = useCallback((id: string, adminNote?: string) => update(id, { status: "rejected", adminNote }), [update])
+  const approve = useCallback((id: string) => {
+    const all = loadRaceSubmissions()
+    const hit = all.find((s) => s.id === id)
+    if (!hit) return
+    // admin-only gating happens in UI/route guard, but keep safe.
+    if (!isAdminEmail(user?.email)) return
+    const next = all.map((s) =>
+      s.id === id
+        ? { ...s, status: "approved" as RaceSubmissionStatus, updatedAt: nowIso(), updatedByUserId: user?.id }
+        : s,
+    )
+    saveRaceSubmissions(next)
+    setSubmissionsState(next)
+  }, [user?.email, user?.id])
 
-  return { submissions, isAdmin, submit, update, remove, approve, reject }
+  const reject = useCallback(
+    (id: string, adminNote?: string) => {
+      const all = loadRaceSubmissions()
+      const hit = all.find((s) => s.id === id)
+      if (!hit) return
+      if (!isAdminEmail(user?.email)) return
+      const next = all.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              status: "rejected" as RaceSubmissionStatus,
+              adminNote,
+              updatedAt: nowIso(),
+              updatedByUserId: user?.id,
+            }
+          : s,
+      )
+      saveRaceSubmissions(next)
+      setSubmissionsState(next)
+    },
+    [user?.email, user?.id],
+  )
+
+  return { submissions, isAdmin, submit, canEdit, updateAsCurrentUser, remove, approve, reject }
 }
 

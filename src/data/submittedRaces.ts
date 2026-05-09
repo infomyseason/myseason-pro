@@ -3,6 +3,7 @@ import { computeDaysUntilRace } from "./mockRaces"
 
 type RaceSubmissionStatus = "pending" | "approved" | "rejected"
 type RaceSubmissionType = "official_race" | "community_race" | "community_event"
+type RegistrationStatus = "open" | "closingSoon" | "soldOut" | "notOpenYet" | "cancelled"
 
 type RaceSubmission = {
   id: string
@@ -23,6 +24,10 @@ type RaceSubmission = {
   entryFee?: string
   websiteUrl?: string
   routeUrl?: string
+  registrationStatus?: RegistrationStatus
+  priceLastUpdatedAt?: string
+  lastCheckedAt?: string
+  priceNote?: string
 }
 
 const STORAGE_KEY = "myseason_race_submissions_v1"
@@ -81,6 +86,10 @@ function coerceSubmission(row: unknown): RaceSubmission | null {
     entryFee: readString(r.entryFee),
     websiteUrl: readString(r.websiteUrl),
     routeUrl: readString(r.routeUrl),
+    registrationStatus: readString(r.registrationStatus) as RegistrationStatus | undefined,
+    priceLastUpdatedAt: readString(r.priceLastUpdatedAt),
+    lastCheckedAt: readString(r.lastCheckedAt),
+    priceNote: readString(r.priceNote),
   }
 }
 
@@ -164,6 +173,10 @@ function submissionToMockRaceDetail(s: RaceSubmission): MockRaceDetail {
     participants: s.estimatedParticipants,
     pricing: s.entryFee?.trim() ? [{ distance: "Entry", priceNote: s.entryFee.trim() }] : [],
     startingPriceLabel: s.entryFee?.trim() ? s.entryFee.trim() : undefined,
+    registrationStatus: s.registrationStatus,
+    priceLastUpdatedAt: s.priceLastUpdatedAt,
+    lastCheckedAt: s.lastCheckedAt,
+    priceNote: s.priceNote,
     officialWebsite: s.websiteUrl?.trim() ? s.websiteUrl.trim() : "#",
     isOfficial: s.type === "official_race",
   }

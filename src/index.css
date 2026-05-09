@@ -2,20 +2,38 @@
 
 /* Premium dark theme aligned with v0 / shadcn-style tokens */
 @theme {
-  --color-background: #090b10;
+  /* Deep navy base (avoid pure black) */
+  --color-background: #070b16;
   --color-foreground: #fafafa;
-  --color-card: #0f1219;
+  --color-card: #0d1424;
   --color-card-foreground: #fafafa;
   --color-primary: #e8c896;
   --color-primary-foreground: #0c0d11;
-  --color-secondary: #141821;
+  --color-secondary: #0f1a2e;
   --color-secondary-foreground: #fafafa;
-  --color-muted: #181c26;
-  --color-muted-foreground: #9ca3af;
-  --color-border: #27272f;
+  --color-muted: #0e182a;
+  --color-muted-foreground: #a5b1c8;
+  --color-border: #24304a;
   --color-ring: #e8c896;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
+}
+
+:root[data-theme="light"] {
+  /* Light mode (still premium, not pure white) */
+  --color-background: #f6f8ff;
+  --color-foreground: #0b1220;
+  --color-card: #ffffff;
+  --color-card-foreground: #0b1220;
+  --color-secondary: #eef2ff;
+  --color-secondary-foreground: #0b1220;
+  --color-muted: #f1f5ff;
+  --color-muted-foreground: #4b5568;
+  --color-border: #d7deee;
+  --color-ring: #e8c896;
+  /* Keep gold accent */
+  --color-primary: #caa66d;
+  --color-primary-foreground: #0b1220;
 }
 
 :root {
@@ -28,8 +46,21 @@
 
 body {
   margin: 0;
-  background: var(--color-background);
+  background-color: var(--color-background);
+  background-image:
+    radial-gradient(900px 600px at 18% 10%, rgba(59, 130, 246, 0.12), transparent 60%),
+    radial-gradient(760px 520px at 82% 18%, rgba(168, 85, 247, 0.10), transparent 58%),
+    radial-gradient(880px 620px at 50% 105%, rgba(232, 200, 150, 0.06), transparent 62%),
+    linear-gradient(180deg, rgba(7, 11, 22, 0.0), rgba(7, 11, 22, 0.35));
   color: var(--color-foreground);
+}
+
+:root[data-theme="light"] body {
+  background-image:
+    radial-gradient(900px 600px at 18% 10%, rgba(59, 130, 246, 0.10), transparent 60%),
+    radial-gradient(760px 520px at 82% 18%, rgba(168, 85, 247, 0.08), transparent 58%),
+    radial-gradient(880px 620px at 50% 105%, rgba(202, 166, 109, 0.08), transparent 62%),
+    linear-gradient(180deg, rgba(246, 248, 255, 0.0), rgba(246, 248, 255, 0.65));
 }
 
 #root {
@@ -88,7 +119,7 @@ body {
 }
 
 .explore-leaflet-shell .leaflet-popup-content-wrapper {
-  background: #0f1219 !important;
+  background: var(--color-card) !important;
   color: #fafafa !important;
   border-radius: 16px !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -96,7 +127,7 @@ body {
 }
 
 .explore-leaflet-shell .leaflet-popup-tip {
-  background: #0f1219 !important;
+  background: var(--color-card) !important;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -107,7 +138,7 @@ body {
 
 .explore-leaflet-shell .leaflet-container {
   font-family: var(--font-sans);
-  background: #090b10;
+  background: var(--color-background);
 }
 
 .explore-leaflet-shell .leaflet-control-zoom a {

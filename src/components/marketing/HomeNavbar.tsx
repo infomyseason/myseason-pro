@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useMockAuth } from "../../hooks/useMockAuth"
 import { usePersistedProfile } from "../../hooks/usePersistedProfile"
+import { useRaceSubmissions } from "../../hooks/useRaceSubmissions"
+import { useTheme } from "../../hooks/useTheme"
 
 type NavLinkItem =
   | { label: string; to: string; accent?: undefined; icon?: "plus" }
@@ -63,7 +65,13 @@ export function HomeNavbar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const profileWrapRef = useRef<HTMLDivElement>(null)
   const { user, isLoggedIn, logout } = useMockAuth()
+  const { submissions, isAdmin } = useRaceSubmissions()
   const { profile } = usePersistedProfile()
+  const { mode, toggle: toggleTheme } = useTheme()
+
+  const pendingApprovals = isAdmin
+    ? submissions.filter((s) => s.type === "official_race" && s.status === "pending").length
+    : 0
 
   const navDisplayName =
     isLoggedIn && profile.displayName.trim()
@@ -226,14 +234,64 @@ export function HomeNavbar() {
           <div className="hidden items-center gap-3 md:flex">
             <button
               type="button"
-              className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-secondary/80 hover:text-foreground"
-              aria-label="Search"
+              onClick={toggleTheme}
+              className="flex h-9 items-center gap-2 rounded-full border border-border/55 bg-secondary/40 px-3 text-sm font-semibold text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+              aria-label="Toggle light/dark mode"
+              title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-                <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
-                <path d="m21 21-4.34-4.34" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              {mode === "dark" ? (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true" className="text-primary/90">
+                  <path
+                    d="M12 3v2m0 14v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M3 12h2m14 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true" className="text-primary/90">
+                  <path
+                    d="M21 12.8A7.2 7.2 0 1 1 11.2 3a6 6 0 0 0 9.8 9.8Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+              <span className="hidden lg:inline">{mode === "dark" ? "Dark" : "Light"}</span>
             </button>
+
+            {isAdmin ? (
+              <Link
+                to="/admin"
+                className="relative inline-flex h-9 items-center gap-2 rounded-full border border-border/55 bg-secondary/40 px-4 text-sm font-semibold text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true" className="text-primary/90">
+                  <path
+                    d="M12 2 20 6v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9.2 12.2 11 14l4-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Race approvals
+                {pendingApprovals > 0 ? (
+                  <span className="ml-1 inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-primary px-2 py-0.5 text-[11px] font-black text-primary-foreground">
+                    {pendingApprovals}
+                  </span>
+                ) : null}
+              </Link>
+            ) : null}
+
             {isLoggedIn ? (
               <div ref={profileWrapRef} className="relative">
                 <button
@@ -333,6 +391,38 @@ export function HomeNavbar() {
       {open ? (
         <div className="border-t border-border/40 bg-background/95 backdrop-blur-xl md:hidden">
           <div className="mx-auto max-w-7xl space-y-1 px-4 py-4">
+            {isAdmin ? (
+              <Link
+                to="/admin"
+                className="flex items-center justify-between rounded-lg bg-secondary/70 px-4 py-3 text-sm font-semibold text-foreground"
+                onClick={() => setOpen(false)}
+              >
+                <span className="flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true" className="text-primary/90">
+                    <path
+                      d="M12 2 20 6v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4Z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M9.2 12.2 11 14l4-5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Race approvals
+                </span>
+                {pendingApprovals > 0 ? (
+                  <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-primary px-2 py-0.5 text-[11px] font-black text-primary-foreground">
+                    {pendingApprovals}
+                  </span>
+                ) : null}
+              </Link>
+            ) : null}
+
             {LINKS.map((link) =>
               link.accent ? (
                 "to" in link ? (

@@ -1,14 +1,229 @@
 import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { computeDaysUntilRace, MOCK_RACE_DETAILS, type MockRaceDetail } from "../../data"
 import { EUROPE_FLAG_BY_CODE } from "../../data/europeanCountries"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
-import { useUserRaceLists } from "../../hooks/useUserRaceLists"
+import { useUserRaceLists, type CalendarEntry, type CalendarGoalType } from "../../hooks/useUserRaceLists"
 import { formatRaceDateLabel } from "../explore/exploreFilters"
 import { Footer } from "../../components/Footer"
 import { HomeNavbar } from "../../components/marketing/HomeNavbar"
 
 type ViewMode = "timeline" | "upcoming" | "month"
+
+function parseSegmentKm(distances: string[], segment: "swim" | "bike" | "run"): number | null {
+  const re = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*km\s*${segment}`, "i")
+  for (const d of distances) {
+    const m = d.match(re)
+    if (!m) continue
+    const v = Number(m[1])
+    if (Number.isFinite(v)) return v
+  }
+  return null
+}
+
+function triathlonFormatOptions(distances: string[]): string[] {
+  const swim = parseSegmentKm(distances, "swim")
+  const bike = parseSegmentKm(distances, "bike")
+  const run = parseSegmentKm(distances, "run")
+  if (swim === null || bike === null || run === null) return []
+
+  const within = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol
+  const formats: string[] = []
+  if (within(swim, 3.8, 0.35) && within(bike, 180, 12) && within(run, 42.2, 2.5)) formats.push("Ironman")
+  if (within(swim, 1.9, 0.25) && within(bike, 90, 8) && within(run, 21.1, 1.8)) formats.push("Ironman 70.3")
+  if (within(swim, 1.5, 0.2) && within(bike, 40, 5) && within(run, 10, 1.2)) formats.push("Olympic")
+  if (within(swim, 0.75, 0.15) && within(bike, 20, 3) && within(run, 5, 0.9)) formats.push("Sprint")
+  return formats
+}
+
+function planningDistanceOptions(race: { sport: string; distances: string[] }): string[] {
+  if (race.sport === "Triathlon") {
+    const formats = triathlonFormatOptions(race.distances)
+    if (formats.length) return formats
+  }
+  return race.distances.length ? race.distances : ["Distance TBD"]
+}
+
+function ellipsis(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) return text
+  let lo = 0
+  let hi = text.length
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2)
+    const s = text.slice(0, mid) + "…"
+    if (ctx.measureText(s).width <= maxWidth) lo = mid + 1
+    else hi = mid
+  }
+  const cut = Math.max(0, lo - 1)
+  return text.slice(0, cut) + "…"
+}
+
+function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function exportSeasonCalendarPng(args: {
+  rows: { race: MockRaceDetail; entry: CalendarEntry }[]
+  title: string
+  subtitle?: string
+  theme: { bg: string; card: string; border: string; text: string; muted: string; gold: string; navy2: string }
+}) {
+  const { rows, title, theme } = args
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1))
+  const W = 860
+  const margin = 44
+  const headerH = 86
+  const rowH = 58
+  const tableHeadH = 44
+  const footerH = 38
+  const maxRows = 18
+  const pageRows = rows.slice(0, maxRows)
+  const H = margin + headerH + tableHeadH + pageRows.length * rowH + footerH + margin
+
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.floor(W * dpr)
+  canvas.height = Math.floor(H * dpr)
+  canvas.style.width = `${W}px`
+  canvas.style.height = `${H}px`
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return
+  ctx.scale(dpr, dpr)
+
+  ctx.fillStyle = theme.bg
+  ctx.fillRect(0, 0, W, H)
+  const grad = ctx.createRadialGradient(W * 0.25, 0, 10, W * 0.25, 0, 420)
+  grad.addColorStop(0, "rgba(232,200,150,0.10)")
+  grad.addColorStop(1, "rgba(0,0,0,0)")
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, W, H)
+
+  ctx.fillStyle = theme.text
+  ctx.font = "800 30px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+  ctx.fillText(title, margin, margin + 42)
+
+  const tableX = margin
+  const tableY = margin + headerH
+  const tableW = W - margin * 2
+  const tableH = tableHeadH + pageRows.length * rowH
+  ctx.fillStyle = theme.card
+  ctx.strokeStyle = theme.border
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.roundRect(tableX, tableY, tableW, tableH, 18)
+  ctx.fill()
+  ctx.stroke()
+
+  ctx.fillStyle = theme.navy2
+  ctx.beginPath()
+  ctx.roundRect(tableX, tableY, tableW, tableHeadH, 18)
+  ctx.fill()
+  ctx.fillRect(tableX, tableY + tableHeadH - 18, tableW, 18)
+
+  // Allocate more space to Race + Distance/Note, less to Sport.
+  const colDate = 120
+  const colRace = 320
+  const colSport = 90
+  const colPlace = 160
+  const colNotes = tableW - (colDate + colRace + colSport + colPlace)
+  const colXs = [
+    tableX,
+    tableX + colDate,
+    tableX + colDate + colRace,
+    tableX + colDate + colRace + colSport,
+    tableX + colDate + colRace + colSport + colPlace,
+  ]
+
+  ctx.fillStyle = "rgba(255,255,255,0.86)"
+  ctx.font = "800 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+  const headY = tableY + 28
+  ctx.fillText("DATE", colXs[0] + 16, headY)
+  ctx.fillText("RACE", colXs[1] + 16, headY)
+  ctx.fillText("SPORT", colXs[2] + 16, headY)
+  ctx.fillText("PLACE", colXs[3] + 16, headY)
+  ctx.fillText("DISTANCE / NOTE", colXs[4] + 16, headY)
+
+  const startY = tableY + tableHeadH
+  for (let i = 0; i < pageRows.length; i++) {
+    const y = startY + i * rowH
+    ctx.strokeStyle = "rgba(255,255,255,0.07)"
+    ctx.beginPath()
+    ctx.moveTo(tableX, y)
+    ctx.lineTo(tableX + tableW, y)
+    ctx.stroke()
+    for (let c = 1; c < colXs.length; c++) {
+      ctx.beginPath()
+      ctx.moveTo(colXs[c], y)
+      ctx.lineTo(colXs[c], y + rowH)
+      ctx.stroke()
+    }
+
+    const { race, entry } = pageRows[i]!
+    const d = new Date(`${race.date}T00:00:00`)
+    const dateLabel = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    const place = `${race.city}, ${race.country}`
+    const distance = entry.selectedDistance || race.distances[0] || "—"
+    const note = entry.userNote?.trim() ? ` · ${entry.userNote.trim()}` : ""
+
+    const padX = 14
+    const baseY = y + 28
+
+    const drawInCell = (x: number, w: number, draw: () => void) => {
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(x + 8, y + 6, w - 16, rowH - 12)
+      ctx.clip()
+      draw()
+      ctx.restore()
+    }
+
+    drawInCell(colXs[0], colDate, () => {
+      ctx.fillStyle = theme.text
+      ctx.font = "800 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+      ctx.fillText(ellipsis(ctx, dateLabel, colDate - (padX * 2)), colXs[0] + padX, baseY)
+    })
+
+    drawInCell(colXs[1], colRace, () => {
+      ctx.fillStyle = theme.text
+      ctx.font = "900 13px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+      ctx.fillText(ellipsis(ctx, race.title, colRace - (padX * 2)), colXs[1] + padX, baseY)
+    })
+
+    drawInCell(colXs[2], colSport, () => {
+      ctx.fillStyle = theme.muted
+      ctx.font = "700 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+      ctx.fillText(ellipsis(ctx, race.sport, colSport - (padX * 2)), colXs[2] + padX, baseY)
+    })
+
+    drawInCell(colXs[3], colPlace, () => {
+      ctx.fillStyle = theme.muted
+      ctx.font = "700 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+      ctx.fillText(ellipsis(ctx, place, colPlace - (padX * 2)), colXs[3] + padX, baseY)
+    })
+
+    drawInCell(colXs[4], colNotes, () => {
+      ctx.fillStyle = theme.text
+      ctx.font = "800 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+      ctx.fillText(ellipsis(ctx, `${distance}${note}`, colNotes - (padX * 2)), colXs[4] + padX, baseY)
+    })
+  }
+
+  const footY = tableY + tableH + 18
+  ctx.fillStyle = theme.gold
+  ctx.font = "900 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial"
+  ctx.fillText("myseason.pro", W - margin - ctx.measureText("myseason.pro").width, footY + 18)
+
+  const blob: Blob | null = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"))
+  if (!blob) return
+  const safe = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+  downloadBlob(`${safe || "my-season-calendar"}.png`, blob)
+}
 
 function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -66,48 +281,67 @@ function ViewChip({ active, children, onClick }: { active: boolean; children: Re
   )
 }
 
-function ActionButton({
-  children,
-  onClick,
-  tone,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  tone: "primary" | "danger" | "neutral"
-}) {
-  const cls =
-    tone === "primary"
-      ? "border-primary/30 bg-primary/12 text-primary hover:border-primary/55 hover:bg-primary/[0.16]"
-      : tone === "danger"
-        ? "border-red-400/25 bg-red-950/25 text-red-200 hover:border-red-400/45 hover:bg-red-950/35"
-        : "border-border/55 bg-secondary/35 text-foreground hover:border-primary/25 hover:bg-secondary/55"
-
+function TrashIcon() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center justify-center rounded-full border px-4 py-2 text-xs font-semibold transition ${cls}`}
-    >
-      {children}
-    </button>
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+      <path
+        d="M9 3h6m-8 4h10m-9 0 .7 13h6.6L17 7M10 11v7m4-7v7M6.5 7h11"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      {filled ? (
+        <path
+          d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+          fill="currentColor"
+        />
+      ) : (
+        <path
+          d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
   )
 }
 
 export function MyCalendarPage() {
+  const navigate = useNavigate()
   const [view, setView] = useState<ViewMode>("timeline")
-  const { calendarRaceIds, plannedRaceIds, completedRaceIds, setLists } = useUserRaceLists()
+  const { calendarEntries, plannedRaceIds, completedRaceIds, setLists } = useUserRaceLists()
   const { isFavourite, toggle: toggleFavourite } = useFavouriteRaceIds()
+  const [planModalOpen, setPlanModalOpen] = useState(false)
+  const [planRaceId, setPlanRaceId] = useState<string | null>(null)
+  const [planDistance, setPlanDistance] = useState("")
+  const [planGoal, setPlanGoal] = useState<CalendarGoalType | "">("")
+  const [planNote, setPlanNote] = useState("")
 
   const raceById = useMemo(() => new Map(MOCK_RACE_DETAILS.map((r) => [r.id, r])), [])
 
-  const calendarRaces = useMemo(() => {
-    const rows = calendarRaceIds
-      .map((id) => raceById.get(id))
-      .filter((r): r is MockRaceDetail => Boolean(r))
+  const calendarRows = useMemo(() => {
+    const rows = calendarEntries
+      .map((e) => ({ entry: e, race: raceById.get(e.raceId) }))
+      .filter((r): r is { entry: CalendarEntry; race: MockRaceDetail } => Boolean(r.race))
       .slice()
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) => a.race.date.localeCompare(b.race.date))
     return rows
-  }, [calendarRaceIds, raceById])
+  }, [calendarEntries, raceById])
+
+  const calendarRaces = useMemo(() => calendarRows.map((r) => r.race), [calendarRows])
+  const entryByRaceId = useMemo(() => new Map(calendarEntries.map((e) => [e.raceId, e] as const)), [calendarEntries])
+  const exportRows = useMemo(() => calendarRows.map((r) => ({ race: r.race, entry: r.entry })), [calendarRows])
 
   const todayIso = isoDate(new Date())
 
@@ -155,9 +389,140 @@ export function MyCalendarPage() {
     return s
   }, [calendarRaces])
 
+  const onRaceCardClick = (raceId: string) => (e: React.MouseEvent<HTMLElement>) => {
+    const t = e.target as HTMLElement | null
+    if (t?.closest("button,a,input,textarea,select,label")) return
+    navigate(`/race/${raceId}`)
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <HomeNavbar />
+      {planModalOpen && planRaceId ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add to your season calendar"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            aria-label="Close"
+            onClick={() => setPlanModalOpen(false)}
+          />
+          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-border/55 bg-background/95 shadow-2xl backdrop-blur-xl">
+            <div className="border-b border-border/40 px-5 py-4">
+              <p className="text-sm font-black text-foreground">Edit season plan</p>
+              <p className="mt-1 text-xs text-muted-foreground">Update distance, goal and note.</p>
+            </div>
+
+            <div className="px-5 py-5">
+              {raceById.get(planRaceId) ? (
+                <>
+                  {(() => {
+                    const race = raceById.get(planRaceId)!
+                    const options = planningDistanceOptions(race)
+                    return (
+                      <>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Distance / category</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {options.map((d) => {
+                      const active = planDistance === d
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setPlanDistance(d)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                            active
+                              ? "border-primary/55 bg-primary/18 text-primary"
+                              : "border-border/55 bg-secondary/35 text-foreground hover:border-primary/30 hover:bg-secondary/55"
+                          }`}
+                        >
+                          {d}
+                        </button>
+                      )
+                    })}
+                  </div>
+                      </>
+                    )
+                  })()}
+
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Goal (optional)</p>
+                      <select
+                        value={planGoal}
+                        onChange={(e) => setPlanGoal(e.target.value as any)}
+                        className="mt-2 w-full rounded-xl border border-border/55 bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none ring-primary/15 focus:border-primary/40 focus:ring-2"
+                      >
+                        <option value="">No goal</option>
+                        <option value="justFinish">Just finish</option>
+                        <option value="pbAttempt">PB attempt</option>
+                        <option value="trainingRace">Training race</option>
+                        <option value="aRace">A race</option>
+                        <option value="bRace">B race</option>
+                        <option value="cRace">C race</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Note (optional)</p>
+                      <textarea
+                        value={planNote}
+                        onChange={(e) => setPlanNote(e.target.value)}
+                        className="mt-2 min-h-[84px] w-full resize-y rounded-xl border border-border/55 bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none ring-primary/15 focus:border-primary/40 focus:ring-2"
+                        placeholder="e.g. Fuel plan, pacing, travel, recovery focus…"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Race not found.</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-border/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                className="rounded-full border border-border/55 bg-secondary/40 px-5 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                onClick={() => setPlanModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!planDistance.trim()}
+                className="rounded-full bg-primary/90 px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/15 transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  const race = raceById.get(planRaceId)
+                  if (!race) return
+                  const dist = planDistance.trim()
+                  if (!dist) return
+                  const prev = calendarEntries
+                  const existing = prev.find((e) => e.raceId === race.id)
+                  const nextEntry: CalendarEntry = {
+                    raceId: race.id,
+                    selectedDistance: dist,
+                    ...(planGoal ? { goalType: planGoal as CalendarGoalType } : {}),
+                    ...(planNote.trim() ? { userNote: planNote.trim() } : {}),
+                    addedAt: existing?.addedAt ?? new Date().toISOString(),
+                  }
+                  const nextEntries = existing ? prev.map((e) => (e.raceId === race.id ? nextEntry : e)) : [nextEntry, ...prev]
+                  setLists({
+                    plannedRaceIds,
+                    completedRaceIds,
+                    calendarEntries: nextEntries,
+                  })
+                  setPlanModalOpen(false)
+                }}
+              >
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <main className="relative overflow-hidden pb-20 pt-24">
         <div className="pointer-events-none absolute inset-0">
@@ -186,6 +551,29 @@ export function MyCalendarPage() {
                 <ViewChip active={view === "upcoming"} onClick={() => setView("upcoming")}>
                   Upcoming view
                 </ViewChip>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const root = getComputedStyle(document.documentElement)
+                    void exportSeasonCalendarPng({
+                      rows: exportRows,
+                      title: "2026 Race Calendar",
+                      theme: {
+                        bg: root.getPropertyValue("--color-background").trim() || "#070b16",
+                        card: root.getPropertyValue("--color-card").trim() || "#0d1424",
+                        border: root.getPropertyValue("--color-border").trim() || "#24304a",
+                        text: root.getPropertyValue("--color-foreground").trim() || "#e8eefc",
+                        muted: root.getPropertyValue("--color-muted-foreground").trim() || "#a5b1c8",
+                        gold: root.getPropertyValue("--color-primary").trim() || "#e8c896",
+                        navy2: "rgba(15,26,46,0.85)",
+                      },
+                    })
+                  }}
+                  className="rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-xs font-bold uppercase tracking-wide text-primary transition hover:border-primary/45 hover:bg-primary/[0.14]"
+                  title="Download a PNG calendar"
+                >
+                  Download
+                </button>
               </div>
             </div>
           </header>
@@ -249,7 +637,10 @@ export function MyCalendarPage() {
                       .map((r) => (
                         <div
                           key={r.id}
-                          className="flex flex-col gap-3 rounded-2xl border border-border/45 bg-background/30 p-5 transition hover:border-primary/25 hover:bg-background/40 sm:flex-row sm:items-center sm:justify-between"
+                          className="relative flex cursor-pointer flex-col gap-3 rounded-2xl border border-border/45 bg-background/30 p-5 transition hover:border-primary/25 hover:bg-background/40 sm:flex-row sm:items-center sm:justify-between"
+                          role="link"
+                          tabIndex={0}
+                          onClick={onRaceCardClick(r.id)}
                         >
                           <div className="min-w-0">
                             <p className="text-xs font-bold uppercase tracking-wider text-primary/90">{r.sport}</p>
@@ -260,36 +651,64 @@ export function MyCalendarPage() {
                               {EUROPE_FLAG_BY_CODE[r.countryCode] ?? "🏁"} {r.city}, {r.country} · {formatRaceDateLabel(r.date)}
                             </p>
                             <p className="mt-2 text-xs text-muted-foreground">
-                              {computeDaysUntilRace(r.date)} days · {r.distances[0] ?? "Distance TBD"}
+                              {computeDaysUntilRace(r.date)} days ·{" "}
+                              {entryByRaceId.get(r.id)?.selectedDistance?.trim() || r.distances[0] || "Distance TBD"}
                             </p>
                           </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <ActionButton
-                              tone="danger"
-                              onClick={() =>
-                                setLists({
-                                  plannedRaceIds,
-                                  completedRaceIds,
-                                  calendarRaceIds: calendarRaceIds.filter((id) => id !== r.id),
-                                })
-                              }
-                            >
-                              Remove
-                            </ActionButton>
-                            <ActionButton
-                              tone="primary"
-                              onClick={() => {
-                                if (!isFavourite(r.id)) toggleFavourite(r.id)
-                                setLists({
-                                  plannedRaceIds,
-                                  completedRaceIds,
-                                  calendarRaceIds: calendarRaceIds.filter((id) => id !== r.id),
-                                })
-                              }}
-                            >
-                              Move to favourites only
-                            </ActionButton>
+                          <div className="flex flex-col gap-2 sm:items-end">
+                            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setLists({
+                                    plannedRaceIds,
+                                    completedRaceIds,
+                                    calendarEntries: calendarEntries.filter((e) => e.raceId !== r.id),
+                                  })
+                                }
+                                className="inline-flex size-9 items-center justify-center rounded-full border border-red-400/25 bg-red-950/25 text-red-200 transition hover:border-red-400/45 hover:bg-red-950/35"
+                                aria-label="Remove from calendar"
+                                title="Remove"
+                              >
+                                <TrashIcon />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!isFavourite(r.id)) toggleFavourite(r.id)
+                                  setLists({
+                                    plannedRaceIds,
+                                    completedRaceIds,
+                                    calendarEntries: calendarEntries.filter((e) => e.raceId !== r.id),
+                                  })
+                                }}
+                                className="inline-flex size-9 items-center justify-center rounded-full border border-primary/30 bg-primary/12 text-primary transition hover:border-primary/55 hover:bg-primary/[0.16]"
+                                aria-label="Move to favourites only"
+                                title="Move to favourites only"
+                              >
+                                <HeartIcon filled={isFavourite(r.id)} />
+                              </button>
+                            </div>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const existing = entryByRaceId.get(r.id) ?? null
+                              const defaultDistance =
+                                existing?.selectedDistance?.trim() || (r.distances.length === 1 ? (r.distances[0] ?? "") : "")
+                              setPlanRaceId(r.id)
+                              setPlanDistance(defaultDistance)
+                              setPlanGoal((existing?.goalType ?? "") as any)
+                              setPlanNote(existing?.userNote ?? "")
+                              setPlanModalOpen(true)
+                            }}
+                            className="absolute bottom-4 right-4 inline-flex items-center justify-center rounded-full border border-border/55 bg-secondary/40 px-4 py-2 text-xs font-semibold text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                            aria-label="Edit plan"
+                            title="Edit plan"
+                          >
+                            Edit plan
+                          </button>
                         </div>
                       ))}
                   </div>
@@ -394,10 +813,66 @@ export function MyCalendarPage() {
                               />
 
                               <div
-                                className={`rounded-2xl border bg-background/30 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition ${
+                                className={`relative rounded-2xl border bg-background/30 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition ${
                                   isNext ? "border-primary/35 bg-primary/[0.06]" : "border-border/45 hover:border-primary/25 hover:bg-background/40"
                                 }`}
+                                role="link"
+                                tabIndex={0}
+                                onClick={onRaceCardClick(r.id)}
                               >
+                                <div className="absolute right-4 top-4 flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!isFavourite(r.id)) toggleFavourite(r.id)
+                                      setLists({
+                                        plannedRaceIds,
+                                        completedRaceIds,
+                                        calendarEntries: calendarEntries.filter((e) => e.raceId !== r.id),
+                                      })
+                                    }}
+                                    className="inline-flex size-9 items-center justify-center rounded-full border border-primary/30 bg-primary/12 text-primary transition hover:border-primary/55 hover:bg-primary/[0.16]"
+                                    aria-label="Move to favourites only"
+                                    title="Move to favourites only"
+                                  >
+                                    <HeartIcon filled={isFavourite(r.id)} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setLists({
+                                        plannedRaceIds,
+                                        completedRaceIds,
+                                        calendarEntries: calendarEntries.filter((e) => e.raceId !== r.id),
+                                      })
+                                    }
+                                    className="inline-flex size-9 items-center justify-center rounded-full border border-red-400/25 bg-red-950/25 text-red-200 transition hover:border-red-400/45 hover:bg-red-950/35"
+                                    aria-label="Remove from calendar"
+                                    title="Remove"
+                                  >
+                                    <TrashIcon />
+                                  </button>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const existing = entryByRaceId.get(r.id) ?? null
+                                    const defaultDistance =
+                                      existing?.selectedDistance?.trim() ||
+                                      (r.distances.length === 1 ? (r.distances[0] ?? "") : "")
+                                    setPlanRaceId(r.id)
+                                    setPlanDistance(defaultDistance)
+                                    setPlanGoal((existing?.goalType ?? "") as any)
+                                    setPlanNote(existing?.userNote ?? "")
+                                    setPlanModalOpen(true)
+                                  }}
+                                  className="absolute bottom-4 right-4 inline-flex items-center justify-center rounded-full border border-border/55 bg-secondary/40 px-4 py-2 text-xs font-semibold text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                                  aria-label="Edit plan"
+                                  title="Edit plan"
+                                >
+                                  Edit plan
+                                </button>
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                   <div className="min-w-0">
                                     <p className="text-xs font-bold uppercase tracking-wider text-primary/90">{r.sport}</p>
@@ -412,50 +887,30 @@ export function MyCalendarPage() {
                                         {formatRaceDateLabel(r.date)}
                                       </span>
                                       <span className="rounded-full border border-border/55 bg-secondary/35 px-3 py-1 text-xs font-semibold text-foreground">
-                                        {r.distances[0] ?? "Distance TBD"}
+                                        {entryByRaceId.get(r.id)?.selectedDistance?.trim() || r.distances[0] || "Distance TBD"}
                                       </span>
+                                      {entryByRaceId.get(r.id)?.goalType ? (
+                                        <span className="rounded-full border border-border/55 bg-background/40 px-3 py-1 text-xs font-semibold text-foreground">
+                                          {entryByRaceId.get(r.id)!.goalType === "justFinish"
+                                            ? "Just finish"
+                                            : entryByRaceId.get(r.id)!.goalType === "pbAttempt"
+                                              ? "PB attempt"
+                                              : entryByRaceId.get(r.id)!.goalType === "trainingRace"
+                                                ? "Training race"
+                                                : entryByRaceId.get(r.id)!.goalType === "aRace"
+                                                  ? "A race"
+                                                  : entryByRaceId.get(r.id)!.goalType === "bRace"
+                                                    ? "B race"
+                                                    : "C race"}
+                                        </span>
+                                      ) : null}
                                       <span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                                         {computeDaysUntilRace(r.date)} days
                                       </span>
                                     </div>
                                   </div>
 
-                                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                                    <ActionButton
-                                      tone="neutral"
-                                      onClick={() => {
-                                        // open event page (internal)
-                                        window.location.href = `/race/${r.id}`
-                                      }}
-                                    >
-                                      Open
-                                    </ActionButton>
-                                    <ActionButton
-                                      tone="danger"
-                                      onClick={() =>
-                                        setLists({
-                                          plannedRaceIds,
-                                          completedRaceIds,
-                                          calendarRaceIds: calendarRaceIds.filter((id) => id !== r.id),
-                                        })
-                                      }
-                                    >
-                                      Remove
-                                    </ActionButton>
-                                    <ActionButton
-                                      tone="primary"
-                                      onClick={() => {
-                                        if (!isFavourite(r.id)) toggleFavourite(r.id)
-                                        setLists({
-                                          plannedRaceIds,
-                                          completedRaceIds,
-                                          calendarRaceIds: calendarRaceIds.filter((id) => id !== r.id),
-                                        })
-                                      }}
-                                    >
-                                      Move to favourites only
-                                    </ActionButton>
-                                  </div>
+                                  <div className="hidden" />
                                 </div>
                               </div>
                             </div>

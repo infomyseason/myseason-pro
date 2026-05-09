@@ -517,6 +517,8 @@ export function ExplorePage() {
       daysUntil={computeDaysUntilRace(race.date)}
       to={`/race/${race.id}`}
       startingPriceLabel={homepagePriceLabel(race.startingPriceLabel)}
+      registrationStatus={race.registrationStatus}
+      priceNote={race.priceNote}
     />
   )
 

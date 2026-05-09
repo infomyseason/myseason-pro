@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { RequireAdmin } from "./components/auth/RequireAdmin"
 import { RequireAuth } from "./components/auth/RequireAuth"
 import { ScrollToTopFab } from "./components/ScrollToTopFab"
+import { ScrollToTopOnRouteChange } from "./components/ScrollToTopOnRouteChange"
 import { AddRacePage } from "./pages/add-race/AddRacePage"
 import { AdminPage } from "./pages/admin/AdminPage"
 import { CommunityPage } from "./pages/community/CommunityPage"
@@ -18,6 +19,7 @@ import { SettingsPage } from "./pages/settings/SettingsPage"
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTopOnRouteChange />
       <ScrollToTopFab />
       <Routes>
         <Route path="/" element={<HomePage />} />

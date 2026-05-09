@@ -22,7 +22,7 @@ function StatusPill({ status }: { status: RaceSubmission["status"] }) {
 }
 
 export function AdminPage() {
-  const { submissions, approve, reject, remove, update } = useRaceSubmissions()
+  const { submissions, approve, reject, remove, updateAsCurrentUser } = useRaceSubmissions()
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const pendingOfficial = useMemo(
@@ -124,11 +124,11 @@ export function AdminPage() {
                         <div className="mt-5 grid gap-4 border-t border-border/40 pt-5 sm:grid-cols-2">
                           <div className="sm:col-span-2">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Title</label>
-                            <input value={s.title} onChange={(e) => update(s.id, { title: e.target.value })} className={FIELD_CLASS} />
+                            <input value={s.title} onChange={(e) => updateAsCurrentUser(s.id, { title: e.target.value })} className={FIELD_CLASS} />
                           </div>
                           <div>
                             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Sport</label>
-                            <select value={s.sport} onChange={(e) => update(s.id, { sport: e.target.value as any })} className={FIELD_CLASS}>
+                            <select value={s.sport} onChange={(e) => updateAsCurrentUser(s.id, { sport: e.target.value as any })} className={FIELD_CLASS}>
                               {["Running", "Triathlon", "Cycling", "HYROX", "Other"].map((x) => (
                                 <option key={x} value={x}>
                                   {x}
@@ -138,23 +138,66 @@ export function AdminPage() {
                           </div>
                           <div>
                             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</label>
-                            <input type="date" value={s.date} onChange={(e) => update(s.id, { date: e.target.value })} className={FIELD_CLASS} />
+                            <input type="date" value={s.date} onChange={(e) => updateAsCurrentUser(s.id, { date: e.target.value })} className={FIELD_CLASS} />
                           </div>
                           <div>
                             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Country</label>
-                            <input value={s.country} onChange={(e) => update(s.id, { country: e.target.value })} className={FIELD_CLASS} />
+                            <input value={s.country} onChange={(e) => updateAsCurrentUser(s.id, { country: e.target.value })} className={FIELD_CLASS} />
                           </div>
                           <div>
                             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">City</label>
-                            <input value={s.city} onChange={(e) => update(s.id, { city: e.target.value })} className={FIELD_CLASS} />
+                            <input value={s.city} onChange={(e) => updateAsCurrentUser(s.id, { city: e.target.value })} className={FIELD_CLASS} />
                           </div>
                           <div className="sm:col-span-2">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Website (optional)</label>
-                            <input value={s.websiteUrl ?? ""} onChange={(e) => update(s.id, { websiteUrl: e.target.value })} className={FIELD_CLASS} />
+                            <input value={s.websiteUrl ?? ""} onChange={(e) => updateAsCurrentUser(s.id, { websiteUrl: e.target.value })} className={FIELD_CLASS} />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Registration status (optional)
+                            </label>
+                            <select
+                              value={s.registrationStatus ?? ""}
+                              onChange={(e) => updateAsCurrentUser(s.id, { registrationStatus: (e.target.value || undefined) as any })}
+                              className={FIELD_CLASS}
+                            >
+                              <option value="">Not set</option>
+                              <option value="open">Open for registration</option>
+                              <option value="closingSoon">Closing soon</option>
+                              <option value="soldOut">Sold out</option>
+                              <option value="notOpenYet">Registration not open yet</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Price note (optional)</label>
+                            <input value={s.priceNote ?? ""} onChange={(e) => updateAsCurrentUser(s.id, { priceNote: e.target.value })} className={FIELD_CLASS} />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Price last updated (optional)
+                            </label>
+                            <input
+                              type="date"
+                              value={s.priceLastUpdatedAt ?? ""}
+                              onChange={(e) => updateAsCurrentUser(s.id, { priceLastUpdatedAt: e.target.value || undefined })}
+                              className={FIELD_CLASS}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Last checked (optional)
+                            </label>
+                            <input
+                              type="date"
+                              value={s.lastCheckedAt ?? ""}
+                              onChange={(e) => updateAsCurrentUser(s.id, { lastCheckedAt: e.target.value || undefined })}
+                              className={FIELD_CLASS}
+                            />
                           </div>
                           <div className="sm:col-span-2">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Image URL (optional)</label>
-                            <input value={s.imageUrl ?? ""} onChange={(e) => update(s.id, { imageUrl: e.target.value })} className={FIELD_CLASS} />
+                            <input value={s.imageUrl ?? ""} onChange={(e) => updateAsCurrentUser(s.id, { imageUrl: e.target.value })} className={FIELD_CLASS} />
                           </div>
                         </div>
                       ) : null}

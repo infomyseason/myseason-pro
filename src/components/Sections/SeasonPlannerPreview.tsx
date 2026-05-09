@@ -1,3 +1,8 @@
+import { useMemo } from "react"
+import { Link } from "react-router-dom"
+import { computeDaysUntilRace, getRaceDetailById, getSubmittedRaceDetailById, type MockRaceDetail } from "../../data"
+import { useUserRaceLists } from "../../hooks/useUserRaceLists"
+
 type SavedRace = {
   id: string
   title: string
@@ -37,7 +42,84 @@ const SAVED_RACES: SavedRace[] = [
   },
 ]
 
+type PlannedRow = {
+  id: string
+  title: string
+  month: string
+  daysUntil: number
+  detail: string
+  dateIso: string
+}
+
+function monthShort(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`)
+  return new Intl.DateTimeFormat("en-US", { month: "short" }).format(d).toUpperCase()
+}
+
+function daysBetween(aIso: string, bIso: string): number {
+  const a = new Date(`${aIso}T00:00:00`)
+  const b = new Date(`${bIso}T00:00:00`)
+  a.setHours(0, 0, 0, 0)
+  b.setHours(0, 0, 0, 0)
+  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000))
+}
+
 export function SeasonPlannerPreview() {
+  const { calendarEntries } = useUserRaceLists()
+  const calendarRaceIds = useMemo(() => calendarEntries.map((e) => e.raceId), [calendarEntries])
+  const hasCalendar = calendarRaceIds.length > 0
+
+  const plannedRows = useMemo((): PlannedRow[] => {
+    if (!hasCalendar) return []
+    const rows = calendarRaceIds
+      .map((id) => getRaceDetailById(id) ?? getSubmittedRaceDetailById(id))
+      .filter((r): r is MockRaceDetail => Boolean(r))
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 3)
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        month: monthShort(r.date),
+        daysUntil: computeDaysUntilRace(r.date),
+        detail: `${r.city} • ${r.distances[0] ?? "Distance TBD"}`,
+        dateIso: r.date,
+      }))
+    return rows
+  }, [calendarRaceIds, hasCalendar])
+
+  const renderRow = (r: PlannedRow, i: number) => (
+    <div
+      key={r.id}
+      className={`relative overflow-hidden rounded-2xl border border-border/45 bg-secondary/30 px-4 py-3 ring-1 ring-white/[0.03] transition hover:border-primary/25 ${
+        i === 0 ? "border-primary/30 bg-primary/5" : ""
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl border border-border/55 bg-secondary/70 text-center">
+          <div className="text-[9px] font-extrabold tracking-wider text-primary">{r.month}</div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="min-w-0 truncate font-black text-foreground">{r.title}</h4>
+            {i === 0 ? (
+              <span className="shrink-0 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                Next up
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-0.5 text-xs font-medium text-muted-foreground">{r.detail}</p>
+        </div>
+
+        <div className="text-right">
+          <div className="text-lg font-black text-foreground">{r.daysUntil}</div>
+          <div className="text-[11px] font-semibold text-muted-foreground">days</div>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <section className="relative overflow-hidden border-t border-border/30 py-16 md:py-20">
       <div className="pointer-events-none absolute inset-0">
@@ -72,15 +154,15 @@ export function SeasonPlannerPreview() {
           </div>
 
           <div className="mt-10">
-            <a
-              href="#"
+            <Link
+              to="/my-calendar"
               className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-4 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90"
             >
               Start planning your season
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" className="ml-2" aria-hidden="true">
                 <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -96,48 +178,52 @@ export function SeasonPlannerPreview() {
                   Active
                 </div>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">4 races planned</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {hasCalendar ? `${calendarRaceIds.length} race${calendarRaceIds.length === 1 ? "" : "s"} planned` : "4 races planned"}
+              </p>
             </div>
 
             <div className="p-5">
               <div className="space-y-3">
-                {SAVED_RACES.map((r, i) => (
-                  <div
-                    key={r.id}
-                    className={`relative overflow-hidden rounded-2xl border border-border/40 bg-secondary/30 px-4 py-3 ring-1 ring-white/[0.03] transition hover:border-primary/25 ${
-                      i === 0 ? "border-primary/30 bg-primary/5" : ""
-                    }`}
-                  >
-                    {i === 0 ? (
-                      <span className="absolute right-3 top-3 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-                        Next up
-                      </span>
-                    ) : null}
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl border border-border/50 bg-secondary/80 text-center">
-                        <div className="text-[9px] font-extrabold tracking-wider text-primary">{r.month}</div>
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <h4 className="truncate font-black text-foreground">{r.title}</h4>
-                        <p className="mt-0.5 text-xs font-medium text-muted-foreground">{r.detail}</p>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="text-lg font-black text-foreground">{r.days}</div>
-                        <div className="text-[11px] font-semibold text-muted-foreground">days</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                {hasCalendar
+                  ? plannedRows.flatMap((r, i) => {
+                      const nodes: React.ReactNode[] = [renderRow(r, i)]
+                      const next = plannedRows[i + 1]
+                      if (next) {
+                        const gapDays = daysBetween(r.dateIso, next.dateIso)
+                        const weeks = Math.max(1, Math.round(gapDays / 7))
+                        nodes.push(
+                          <div key={`${r.id}:gap`} className="pl-2">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-border/55 bg-background/30 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+                              <span className="size-1.5 rounded-full bg-primary/60" aria-hidden="true" />
+                              {weeks} week{weeks === 1 ? "" : "s"} until next race
+                            </div>
+                          </div>,
+                        )
+                      }
+                      return nodes
+                    })
+                  : SAVED_RACES.map((r, i) =>
+                      renderRow(
+                        {
+                          id: r.id,
+                          title: r.title,
+                          month: r.month,
+                          daysUntil: r.days,
+                          detail: r.detail,
+                          dateIso: "2026-01-01",
+                        },
+                        i,
+                      ),
+                    )}
               </div>
 
-              <button
-                type="button"
+              <Link
+                to={hasCalendar ? "/my-calendar" : "/explore"}
                 className="mt-4 flex w-full items-center justify-center rounded-xl border border-border/50 bg-secondary/50 py-3 text-sm font-semibold text-foreground transition hover:bg-secondary"
               >
-                + Add another race to your season
-              </button>
+                {hasCalendar ? "Open season planner" : "+ Add another race to your season"}
+              </Link>
             </div>
           </div>
         </div>

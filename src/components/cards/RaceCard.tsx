@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom"
 import type { SportKey } from "../sportTokens"
 import { SPORT_STYLES } from "../sportTokens"
+import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
 
 export type RaceCardMode = "local" | "sport" | "featured"
 
@@ -19,6 +20,8 @@ type RaceCardProps = {
   athletesLabel?: string
   /** Second pill next to sport (e.g. Community) */
   extraBadge?: string
+  registrationStatus?: "open" | "closingSoon" | "soldOut" | "notOpenYet" | "cancelled"
+  priceNote?: string
   /** Internal route — card renders as a link (does not open external URLs). */
   to?: string
   /** Opens official site in a new tab; featured cards omit the heart control to avoid nesting interactive elements. */
@@ -31,23 +34,25 @@ type RaceCardProps = {
   compactListing?: boolean
 }
 
-function HeartButton() {
+function HeartIcon({ filled }: { filled: boolean }) {
   return (
-    <button
-      type="button"
-      className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition hover:scale-110 hover:bg-black/60 hover:text-white"
-      aria-label="Save to favourites"
-    >
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      {filled ? (
+        <path
+          d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+          fill="currentColor"
+        />
+      ) : (
         <path
           d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"
+          fill="none"
           stroke="currentColor"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-      </svg>
-    </button>
+      )}
+    </svg>
   )
 }
 
@@ -64,6 +69,8 @@ export function RaceCard({
   major,
   athletesLabel,
   extraBadge,
+  registrationStatus,
+  priceNote,
   to,
   externalHref,
   featuredBlurb,
@@ -71,6 +78,9 @@ export function RaceCard({
   compactListing = false,
 }: RaceCardProps) {
   const sport = SPORT_STYLES[sportKey]
+  const { toggle, isFavourite } = useFavouriteRaceIds()
+  const favId = to ? (to.startsWith("/race/") ? to.slice("/race/".length) : to) : ""
+  const fav = favId ? isFavourite(favId) : false
   const hoverShadow = `hover:shadow-[0_0_60px_rgba(${sport.rgb},0.3)]`
   const restDistances = distances.length > 2 ? distances.length - 2 : 0
 
@@ -103,8 +113,8 @@ export function RaceCard({
           <div
             className={
               compactListing
-                ? "absolute inset-0 bg-gradient-to-t from-[#030508] via-[#070a12]/95 to-[#0c1018]/35"
-                : "absolute inset-0 bg-gradient-to-t from-[#0a0e1a] via-[#0a0e1a]/60 to-[#0a0e1a]/20"
+                ? "absolute inset-0 bg-gradient-to-t from-[#050917] via-[#070b16]/95 to-[#0f1a2e]/35"
+                : "absolute inset-0 bg-gradient-to-t from-[#070b16] via-[#070b16]/60 to-[#0f1a2e]/22"
             }
           />
           <div
@@ -135,6 +145,32 @@ export function RaceCard({
             >
               {sport.emoji} {sport.label}
             </span>
+            {registrationStatus ? (
+              <span
+                className={`rounded-md border px-3 py-1 text-[11px] font-bold uppercase tracking-wide shadow-lg backdrop-blur-sm ${
+                  registrationStatus === "open"
+                    ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"
+                    : registrationStatus === "closingSoon"
+                      ? "border-amber-300/25 bg-amber-400/10 text-amber-200"
+                      : registrationStatus === "soldOut"
+                        ? "border-red-400/25 bg-red-950/20 text-red-200"
+                        : registrationStatus === "notOpenYet"
+                          ? "border-sky-300/20 bg-sky-500/10 text-sky-200"
+                          : "border-border/55 bg-secondary/40 text-muted-foreground"
+                }`}
+                title={priceNote?.trim() ? priceNote.trim() : undefined}
+              >
+                {registrationStatus === "open"
+                  ? "Open"
+                  : registrationStatus === "closingSoon"
+                    ? "Closing soon"
+                    : registrationStatus === "soldOut"
+                      ? "Sold out"
+                      : registrationStatus === "notOpenYet"
+                        ? "Not open yet"
+                        : "Cancelled"}
+              </span>
+            ) : null}
             {!compactListing && extraBadge ? (
               <span className="rounded-md border border-primary/35 bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-lg backdrop-blur-sm">
                 {extraBadge}
@@ -158,7 +194,25 @@ export function RaceCard({
                 {daysUntil} days
               </span>
             ) : null}
-            {!externalHref && !compactListing && (mode === "sport" || mode === "featured") ? <HeartButton /> : null}
+            {!externalHref && favId ? (
+              <button
+                type="button"
+                aria-label={fav ? "Remove from favourites" : "Save to favourites"}
+                aria-pressed={fav}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  toggle(favId)
+                }}
+                className={`flex size-9 shrink-0 items-center justify-center rounded-full border backdrop-blur-md transition hover:scale-110 ${
+                  fav
+                    ? "border-primary/35 bg-primary/15 text-primary hover:bg-primary/20"
+                    : "border-border/55 bg-background/30 text-white/80 hover:bg-background/45 hover:text-white"
+                }`}
+              >
+                <HeartIcon filled={fav} />
+              </button>
+            ) : null}
           </div>
         </div>
 

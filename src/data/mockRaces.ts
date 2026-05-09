@@ -19,6 +19,8 @@ export type EventDetailKind = "race" | "festival"
 /** Softer copy & accents for charity / awareness events (not elite race framing). */
 export type DetailPresentationTone = "standard" | "charityCommunity"
 
+export type RegistrationStatus = "open" | "closingSoon" | "soldOut" | "notOpenYet" | "cancelled"
+
 export type FestivalSection = {
   heading: string
   paragraphs?: string[]
@@ -56,6 +58,14 @@ export type MockRaceDetail = {
   pricing: RacePricingTier[]
   /** Summary line for stats card; omit when unknown — detail page shows “Not published yet”. */
   startingPriceLabel?: string
+  /** Manual status shown on cards/details (no scraping yet). */
+  registrationStatus?: RegistrationStatus
+  /** ISO date — when price was last reviewed/updated. */
+  priceLastUpdatedAt?: string
+  /** ISO date — when status/price was last checked. */
+  lastCheckedAt?: string
+  /** Optional extra pricing note (e.g. "Early bird until May 20"). */
+  priceNote?: string
   officialWebsite: string
   isOfficial: boolean
   /** Default marathon-style detail page when omitted. */
@@ -87,6 +97,8 @@ export type MockRaceListItem = {
   imageUrl: string
   daysUntil: number
   startingPriceLabel?: string
+  registrationStatus?: RegistrationStatus
+  priceNote?: string
 }
 
 function formatRaceDateLabel(isoDate: string): string {
@@ -873,6 +885,8 @@ function detailToListItem(d: MockRaceDetail): MockRaceListItem {
     imageUrl: d.image,
     daysUntil: computeDaysUntilRace(d.date),
     startingPriceLabel: d.startingPriceLabel,
+    registrationStatus: d.registrationStatus,
+    priceNote: d.priceNote,
   }
 }
 

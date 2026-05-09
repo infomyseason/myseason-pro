@@ -8,8 +8,8 @@ const FLAG_BY_CODE = EUROPE_FLAG_BY_CODE
 
 type Selection = "ALL" | string
 
-/** Default chip selection — Lithuania. */
-const DEFAULT_SELECTED_COUNTRY_CODE: Selection = "LT"
+/** Default chip selection — All countries. */
+const DEFAULT_SELECTED_COUNTRY_CODE: Selection = "ALL"
 
 /** Inline chips only; every other European country is reachable via search dropdown. */
 const CHIP_COUNTRY_CODES = ["DE", "FR", "GB", "ES", "IT", "NL"] as const
@@ -163,7 +163,7 @@ export function LocalRaces() {
     <section className="relative overflow-x-hidden border-t border-border/30 py-10 md:py-14">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute right-0 top-0 h-[420px] w-[420px] rounded-full bg-primary/5 blur-[100px]" />
-        <div className="absolute bottom-0 left-0 h-[320px] w-[320px] rounded-full bg-[#22c55e]/5 blur-[90px]" />
+        <div className="absolute bottom-0 left-0 h-[320px] w-[320px] rounded-full bg-[#3b82f6]/6 blur-[95px]" />
       </div>
 
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -210,7 +210,7 @@ export function LocalRaces() {
                   className={`${chipBase} ${
                     active
                       ? "border-primary/40 bg-primary/[0.14] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-primary/20"
-                      : "border-white/[0.1] bg-[#0a0d14]/45 text-foreground/90 ring-white/[0.04] hover:border-primary/28 hover:bg-[#0a0d14]/70"
+                      : "border-border/55 bg-background/40 text-foreground/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/[0.02] hover:border-primary/25 hover:bg-secondary/50"
                   }`}
                 >
                   {opt.flag ? (
@@ -246,14 +246,14 @@ export function LocalRaces() {
               aria-expanded={searchOpen && countryQuery.trim().length > 0}
               aria-controls="local-races-country-results"
               aria-autocomplete="list"
-              className="relative z-10 h-9 w-full min-w-0 max-w-full rounded-full border border-white/[0.09] bg-[#0a0d14]/55 pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/65 backdrop-blur-xl ring-1 ring-white/[0.04] transition-colors focus:border-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/15 md:text-[13px]"
+              className="relative z-10 h-9 w-full min-w-0 max-w-full rounded-full border border-border/55 bg-background/40 pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground/65 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/[0.02] transition-colors focus:border-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/15 md:text-[13px]"
               aria-label="Search European countries"
             />
             {searchOpen && countryQuery.trim().length > 0 ? (
               <ul
                 id="local-races-country-results"
                 role="listbox"
-                className="scrollbar-hide absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-xl border border-white/[0.09] bg-[#0a0d14]/95 py-1 shadow-[0_16px_48px_-24px_rgba(0,0,0,0.85)] ring-1 ring-white/[0.06] backdrop-blur-xl"
+                className="scrollbar-hide absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-xl border border-border/55 bg-card/95 py-1 shadow-[0_18px_60px_-30px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.04] backdrop-blur-xl"
               >
                 {searchMatches.length === 0 ? (
                   <li className="px-3 py-2 text-xs text-muted-foreground">No matching countries</li>
@@ -334,6 +334,8 @@ export function LocalRaces() {
                 daysUntil={race.daysUntil}
                 to={`/race/${race.id}`}
                 startingPriceLabel={homepagePriceLabel(race.startingPriceLabel)}
+                registrationStatus={race.registrationStatus}
+                priceNote={race.priceNote}
               />
             ))}
           </div>

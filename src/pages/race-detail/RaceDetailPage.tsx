@@ -1,9 +1,44 @@
-import { useEffect, useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { computeDaysUntilRace, getRaceDetailById, getSubmittedRaceDetailById } from "../../data"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
-import { useUserRaceLists } from "../../hooks/useUserRaceLists"
+import { useUserRaceLists, type CalendarEntry, type CalendarGoalType } from "../../hooks/useUserRaceLists"
+import { useRaceSubmissions } from "../../hooks/useRaceSubmissions"
 import { SPORT_STYLES, sportKeyFromLabel } from "../../components/sportTokens"
+
+function parseSegmentKm(distances: string[], segment: "swim" | "bike" | "run"): number | null {
+  const re = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*km\s*${segment}`, "i")
+  for (const d of distances) {
+    const m = d.match(re)
+    if (!m) continue
+    const v = Number(m[1])
+    if (Number.isFinite(v)) return v
+  }
+  return null
+}
+
+function triathlonFormatOptions(distances: string[]): string[] {
+  const swim = parseSegmentKm(distances, "swim")
+  const bike = parseSegmentKm(distances, "bike")
+  const run = parseSegmentKm(distances, "run")
+  if (swim === null || bike === null || run === null) return []
+
+  const within = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol
+  const formats: string[] = []
+  if (within(swim, 3.8, 0.35) && within(bike, 180, 12) && within(run, 42.2, 2.5)) formats.push("Ironman")
+  if (within(swim, 1.9, 0.25) && within(bike, 90, 8) && within(run, 21.1, 1.8)) formats.push("Ironman 70.3")
+  if (within(swim, 1.5, 0.2) && within(bike, 40, 5) && within(run, 10, 1.2)) formats.push("Olympic")
+  if (within(swim, 0.75, 0.15) && within(bike, 20, 3) && within(run, 5, 0.9)) formats.push("Sprint")
+  return formats
+}
+
+function planningDistanceOptions(race: { sport: string; distances: string[] }): string[] {
+  if (race.sport === "Triathlon") {
+    const formats = triathlonFormatOptions(race.distances)
+    if (formats.length) return formats
+  }
+  return race.distances.length ? race.distances : ["Distance TBD"]
+}
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
@@ -28,11 +63,23 @@ function HeartIcon({ filled }: { filled: boolean }) {
 }
 
 export function RaceDetailPage() {
+  const navigate = useNavigate()
   const { raceId } = useParams<{ raceId: string }>()
   const race = raceId ? getRaceDetailById(raceId) ?? getSubmittedRaceDetailById(raceId) : undefined
   const [routeMapOpen, setRouteMapOpen] = useState(false)
   const { toggle, isFavourite } = useFavouriteRaceIds()
-  const { calendarRaceIds, setLists, plannedRaceIds, completedRaceIds } = useUserRaceLists()
+  const { calendarEntries, setLists, plannedRaceIds, completedRaceIds } = useUserRaceLists()
+  const { submissions, canEdit } = useRaceSubmissions()
+
+  const [calendarModalOpen, setCalendarModalOpen] = useState(false)
+  const [planDistance, setPlanDistance] = useState("")
+  const [planGoal, setPlanGoal] = useState<CalendarGoalType | "">("")
+  const [planNote, setPlanNote] = useState("")
+
+  const canGoBack = useMemo(() => {
+    const idx = (window.history.state as { idx?: unknown } | null)?.idx
+    return typeof idx === "number" ? idx > 0 : window.history.length > 1
+  }, [])
 
   useEffect(() => {
     setRouteMapOpen(false)
@@ -57,14 +104,17 @@ export function RaceDetailPage() {
       <div className="min-h-screen bg-background px-4 py-28 text-center">
         <p className="text-muted-foreground">We couldn’t find this race.</p>
         <Link
-          to="/"
+          to="/explore"
           className="mt-6 inline-flex rounded-full border border-primary/30 bg-primary/10 px-5 py-2 text-sm font-semibold text-primary transition hover:border-primary/50 hover:bg-primary/[0.14]"
         >
-          Back to home
+          Back to explore
         </Link>
       </div>
     )
   }
+
+  const linkedSubmission = submissions.find((s) => s.id === race.id) ?? null
+  const allowEdit = linkedSubmission ? canEdit(linkedSubmission) : false
 
   const sportKey = sportKeyFromLabel(race.sport)
   const sport = SPORT_STYLES[sportKey]
@@ -94,21 +144,39 @@ export function RaceDetailPage() {
   const routeModalSrc = race.routeUrl ?? race.routeImage
   const routePreviewInteractive = race.hasRoute && Boolean(routePreviewSrc && routeModalSrc)
   const savedToFavourites = isFavourite(race.id)
-  const inCalendar = calendarRaceIds.includes(race.id)
+  const existingPlan = calendarEntries.find((e) => e.raceId === race.id) ?? null
+  const inCalendar = Boolean(existingPlan)
+  const distanceOptions = useMemo(() => planningDistanceOptions(race), [race])
+  const registrationLabel =
+    race.registrationStatus === "open"
+      ? "Open for registration"
+      : race.registrationStatus === "closingSoon"
+        ? "Closing soon"
+        : race.registrationStatus === "soldOut"
+          ? "Sold out"
+          : race.registrationStatus === "notOpenYet"
+            ? "Registration not open yet"
+            : race.registrationStatus === "cancelled"
+              ? "Cancelled"
+              : null
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border/40 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3.5 sm:px-6 sm:py-4">
-          <Link
-            to="/"
+          <button
+            type="button"
+            onClick={() => {
+              if (canGoBack) navigate(-1)
+              else navigate("/explore")
+            }}
             className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-muted-foreground transition hover:text-primary"
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
               <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Back
-          </Link>
+          </button>
           {race.isOfficial ? (
             <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#f5e6c8]/55 bg-primary px-4 py-2 text-[12px] font-bold tracking-[0.02em] text-primary-foreground shadow-[0_2px_20px_-4px_rgba(232,200,150,0.72),0_1px_0_rgba(255,255,255,0.4)_inset,inset_0_-1px_0_rgba(12,13,17,0.1)] ring-1 ring-white/30">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden="true" className="shrink-0">
@@ -128,6 +196,119 @@ export function RaceDetailPage() {
       </header>
 
       <div className="relative mx-auto max-w-5xl px-4 pb-10 pt-4 sm:px-6 sm:pt-5">
+        {calendarModalOpen ? (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add to your season calendar"
+          >
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              aria-label="Close"
+              onClick={() => setCalendarModalOpen(false)}
+            />
+            <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-border/55 bg-background/95 shadow-2xl backdrop-blur-xl">
+              <div className="border-b border-border/40 px-5 py-4">
+                <p className="text-sm font-black text-foreground">Add to your season calendar</p>
+                <p className="mt-1 text-xs text-muted-foreground">Choose your distance and optional goal.</p>
+              </div>
+
+              <div className="px-5 py-5">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Distance / category</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {distanceOptions.map((d) => {
+                    const active = planDistance === d
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setPlanDistance(d)}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          active
+                            ? "border-primary/55 bg-primary/18 text-primary"
+                            : "border-border/55 bg-secondary/35 text-foreground hover:border-primary/30 hover:bg-secondary/55"
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Goal (optional)</p>
+                    <select
+                      value={planGoal}
+                      onChange={(e) => setPlanGoal(e.target.value as any)}
+                      className="mt-2 w-full rounded-xl border border-border/55 bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none ring-primary/15 focus:border-primary/40 focus:ring-2"
+                    >
+                      <option value="">No goal</option>
+                      <option value="justFinish">Just finish</option>
+                      <option value="pbAttempt">PB attempt</option>
+                      <option value="trainingRace">Training race</option>
+                      <option value="aRace">A race</option>
+                      <option value="bRace">B race</option>
+                      <option value="cRace">C race</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Note (optional)</p>
+                    <textarea
+                      value={planNote}
+                      onChange={(e) => setPlanNote(e.target.value)}
+                      className="mt-2 min-h-[84px] w-full resize-y rounded-xl border border-border/55 bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none ring-primary/15 focus:border-primary/40 focus:ring-2"
+                      placeholder="e.g. Fuel plan, pacing, travel, recovery focus…"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 border-t border-border/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <button
+                  type="button"
+                  className="rounded-full border border-border/55 bg-secondary/40 px-5 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/25 hover:bg-secondary/60"
+                  onClick={() => setCalendarModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!planDistance.trim()}
+                  className="rounded-full bg-primary/90 px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/15 transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => {
+                    const dist = planDistance.trim()
+                    if (!dist) return
+                    const prev = calendarEntries
+                    const existing = prev.find((e) => e.raceId === race.id)
+                    const nextEntry: CalendarEntry = {
+                      raceId: race.id,
+                      selectedDistance: dist,
+                      ...(planGoal ? { goalType: planGoal as CalendarGoalType } : {}),
+                      ...(planNote.trim() ? { userNote: planNote.trim() } : {}),
+                      addedAt: existing?.addedAt ?? new Date().toISOString(),
+                    }
+                    const nextEntries = existing
+                      ? prev.map((e) => (e.raceId === race.id ? nextEntry : e))
+                      : [nextEntry, ...prev]
+
+                    setLists({
+                      plannedRaceIds,
+                      completedRaceIds,
+                      calendarEntries: nextEntries,
+                    })
+                    setCalendarModalOpen(false)
+                  }}
+                >
+                  Save to calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] shadow-[0_24px_80px_-40px_rgba(0,0,0,0.85)] ring-1 ring-white/[0.04]">
           <div className="relative h-[180px] w-full md:h-[240px]">
             <img src={race.image} alt={race.title} className="absolute inset-0 h-full w-full object-cover" />
@@ -199,18 +380,24 @@ export function RaceDetailPage() {
                 <HeartIcon filled={savedToFavourites} />
                 {savedToFavourites ? "Saved to favourites" : "Save to favourites"}
               </button>
+              {allowEdit ? (
+                <Link
+                  to={`/add-race?edit=${encodeURIComponent(linkedSubmission!.id)}`}
+                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full border border-border/55 bg-secondary/50 px-4 py-2.5 text-sm font-bold text-foreground transition hover:border-primary/25 hover:bg-secondary/70 sm:w-auto sm:px-5"
+                >
+                  Edit event
+                </Link>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {
-                  setLists({
-                    plannedRaceIds,
-                    completedRaceIds,
-                    calendarRaceIds: inCalendar
-                      ? calendarRaceIds.filter((id) => id !== race.id)
-                      : [...calendarRaceIds, race.id],
-                  })
+                  const defaultDistance =
+                    existingPlan?.selectedDistance?.trim() || (distanceOptions.length === 1 ? (distanceOptions[0] ?? "") : "")
+                  setPlanDistance(defaultDistance)
+                  setPlanGoal((existingPlan?.goalType ?? "") as any)
+                  setPlanNote(existingPlan?.userNote ?? "")
+                  setCalendarModalOpen(true)
                 }}
-                aria-pressed={inCalendar}
                 className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors sm:w-auto ${
                   inCalendar
                     ? "border border-primary/40 bg-primary/12 text-primary ring-1 ring-primary/20 hover:bg-primary/[0.16]"
@@ -218,9 +405,37 @@ export function RaceDetailPage() {
                 }`}
               >
                 <span aria-hidden="true">📅</span>
-                <span>{inCalendar ? "Added to calendar" : "Add to calendar"}</span>
+                <span>{inCalendar ? "Edit plan" : "Add to calendar"}</span>
               </button>
             </div>
+
+            {registrationLabel ? (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span
+                  className={`inline-flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-wide ${
+                    race.registrationStatus === "open"
+                      ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"
+                      : race.registrationStatus === "closingSoon"
+                        ? "border-amber-300/25 bg-amber-400/10 text-amber-200"
+                        : race.registrationStatus === "soldOut"
+                          ? "border-red-400/25 bg-red-950/20 text-red-200"
+                          : race.registrationStatus === "notOpenYet"
+                            ? "border-sky-300/20 bg-sky-500/10 text-sky-200"
+                            : "border-border/55 bg-secondary/40 text-muted-foreground"
+                  }`}
+                  title={race.lastCheckedAt?.trim() ? `Last checked: ${race.lastCheckedAt}` : undefined}
+                >
+                  {registrationLabel}
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  Prices and registration status may change. Always check the official website before registering.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Prices and registration status may change. Always check the official website before registering.
+              </p>
+            )}
 
             <div className="mt-5 space-y-2 border-b border-white/[0.06] pb-4">
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">

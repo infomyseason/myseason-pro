@@ -5,10 +5,20 @@ import { notifyUserDataChanged, USER_DATA_CHANGED_EVENT } from "./userScopedStor
 /** `Record<userId, UserRaceLists>` — never cleared on logout. */
 export const USER_RACE_LISTS_MAP_KEY = "myseason_user_race_lists"
 
+export type CalendarGoalType = "justFinish" | "pbAttempt" | "trainingRace" | "aRace" | "bRace" | "cRace"
+
+export type CalendarEntry = {
+  raceId: string
+  selectedDistance: string
+  goalType?: CalendarGoalType
+  userNote?: string
+  addedAt: string // ISO
+}
+
 export type UserRaceLists = {
   plannedRaceIds: string[]
   completedRaceIds: string[]
-  calendarRaceIds: string[]
+  calendarEntries: CalendarEntry[]
 }
 
 function legacyRaceListsBlobKey(userId: string): string {
@@ -19,7 +29,7 @@ export function defaultUserRaceLists(): UserRaceLists {
   return {
     plannedRaceIds: [],
     completedRaceIds: [],
-    calendarRaceIds: [],
+    calendarEntries: [],
   }
 }
 
@@ -28,11 +38,44 @@ function readIdArray(v: unknown): string[] {
   return v.filter((x): x is string => typeof x === "string")
 }
 
+function readCalendarEntries(v: unknown): CalendarEntry[] {
+  if (!Array.isArray(v)) return []
+  const out: CalendarEntry[] = []
+  for (const row of v) {
+    if (typeof row !== "object" || row === null) continue
+    const r = row as Record<string, unknown>
+    const raceId = typeof r.raceId === "string" ? r.raceId : null
+    const selectedDistance = typeof r.selectedDistance === "string" ? r.selectedDistance : ""
+    const addedAt = typeof r.addedAt === "string" ? r.addedAt : null
+    if (!raceId || !addedAt) continue
+    const goalType = typeof r.goalType === "string" ? (r.goalType as CalendarGoalType) : undefined
+    const userNote = typeof r.userNote === "string" ? r.userNote : undefined
+    out.push({
+      raceId,
+      selectedDistance,
+      ...(goalType ? { goalType } : {}),
+      ...(userNote?.trim() ? { userNote } : {}),
+      addedAt,
+    })
+  }
+  return out
+}
+
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
+  const legacyCalendarIds = readIdArray(row.calendarRaceIds)
+  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const mergedEntries =
+    calendarEntries.length > 0
+      ? calendarEntries
+      : legacyCalendarIds.map((raceId) => ({
+          raceId,
+          selectedDistance: "",
+          addedAt: new Date().toISOString(),
+        }))
   return {
     plannedRaceIds: readIdArray(row.plannedRaceIds),
     completedRaceIds: readIdArray(row.completedRaceIds),
-    calendarRaceIds: readIdArray(row.calendarRaceIds),
+    calendarEntries: mergedEntries,
   }
 }
 
@@ -135,7 +178,7 @@ export function useUserRaceLists(): UserRaceLists & {
     ...lists,
     plannedCount: lists.plannedRaceIds.length,
     completedCount: lists.completedRaceIds.length,
-    calendarCount: lists.calendarRaceIds.length,
+    calendarCount: lists.calendarEntries.length,
     setLists,
   }
 }
