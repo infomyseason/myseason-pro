@@ -6,16 +6,17 @@ import { usePersistedProfile } from "../../hooks/usePersistedProfile"
 type NavLinkItem =
   | { label: string; to: string; accent?: undefined; icon?: "plus" }
   | { label: string; href: string; accent?: true; icon?: "plus" }
+  | { label: string; to: string; accent: true; icon?: "plus" }
 
 const LINKS: NavLinkItem[] = [
   { label: "Explore", to: "/explore" },
   {
     label: "My Calendar",
-    href: "#",
+    to: "/my-calendar",
     accent: true as const,
   },
-  { label: "Community", href: "#" },
-  { label: "Add Race", href: "#", icon: "plus" as const },
+  { label: "Community", to: "/community" },
+  { label: "Add Race", to: "/add-race", icon: "plus" as const },
 ]
 
 const ICON_PROFILE = (
@@ -143,11 +144,12 @@ export function HomeNavbar() {
           <div className="hidden items-center gap-1 md:flex">
             {LINKS.map((link) =>
               link.accent ? (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className="mx-2 flex items-center gap-2 rounded-full border border-primary/20 bg-gradient-to-r from-primary/20 to-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-all duration-300 hover:border-primary/40 hover:from-primary/30 hover:to-primary/20 hover:shadow-lg hover:shadow-primary/10"
-                >
+                "to" in link ? (
+                  <Link
+                    key={link.label}
+                    to={link.to}
+                    className="mx-2 flex items-center gap-2 rounded-full border border-primary/20 bg-gradient-to-r from-primary/20 to-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-all duration-300 hover:border-primary/40 hover:from-primary/30 hover:to-primary/20 hover:shadow-lg hover:shadow-primary/10"
+                  >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
                     <path
                       d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
@@ -164,7 +166,31 @@ export function HomeNavbar() {
                       strokeWidth="2"
                     />
                   </svg>
-                </a>
+                  </Link>
+                ) : (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    className="mx-2 flex items-center gap-2 rounded-full border border-primary/20 bg-gradient-to-r from-primary/20 to-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-all duration-300 hover:border-primary/40 hover:from-primary/30 hover:to-primary/20 hover:shadow-lg hover:shadow-primary/10"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+                      <path
+                        d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    {link.label}
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" className="opacity-70" aria-hidden="true">
+                      <path
+                        d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                    </svg>
+                  </a>
+                )
               ) : "to" in link ? (
                 <Link
                   key={link.label}
@@ -309,16 +335,25 @@ export function HomeNavbar() {
           <div className="mx-auto max-w-7xl space-y-1 px-4 py-4">
             {LINKS.map((link) =>
               link.accent ? (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className={`block rounded-lg px-4 py-3 text-sm font-semibold ${
-                    link.accent ? "bg-primary/15 text-primary" : "text-foreground"
-                  }`}
-                  onClick={() => setOpen(false)}
-                >
-                  {link.label}
-                </a>
+                "to" in link ? (
+                  <Link
+                    key={link.label}
+                    to={link.to}
+                    className="block rounded-lg bg-primary/15 px-4 py-3 text-sm font-semibold text-primary"
+                    onClick={() => setOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    className="block rounded-lg bg-primary/15 px-4 py-3 text-sm font-semibold text-primary"
+                    onClick={() => setOpen(false)}
+                  >
+                    {link.label}
+                  </a>
+                )
               ) : "to" in link ? (
                 <Link
                   key={link.label}

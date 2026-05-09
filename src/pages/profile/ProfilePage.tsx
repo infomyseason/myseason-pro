@@ -9,6 +9,7 @@ import {
   usePersistedProfile,
 } from "../../hooks/usePersistedProfile"
 import { useUserRaceLists } from "../../hooks/useUserRaceLists"
+import { useRaceSubmissions } from "../../hooks/useRaceSubmissions"
 import { RaceCard } from "../../components/cards/RaceCard"
 import { Footer } from "../../components/Footer"
 import { HomeNavbar } from "../../components/marketing/HomeNavbar"
@@ -34,6 +35,7 @@ function homepagePriceLabel(label?: string): string | undefined {
 const TABS = [
   { id: "favourites" as const, label: "Favourites" },
   { id: "calendar" as const, label: "Calendar" },
+  { id: "submissions" as const, label: "Submissions" },
   { id: "completed" as const, label: "Completed" },
   { id: "stats" as const, label: "Stats" },
 ]
@@ -45,6 +47,7 @@ export function ProfilePage() {
   const { profile, setProfile } = usePersistedProfile()
   const { ids, toggle } = useFavouriteRaceIds()
   const { plannedCount, completedCount, calendarCount } = useUserRaceLists()
+  const { submissions } = useRaceSubmissions()
   const [activeTab, setActiveTab] = useState<ProfileTabId>("favourites")
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<LocalProfile>(() => ({
@@ -62,6 +65,7 @@ export function ProfilePage() {
 
   const favouriteCount = ids.size
   const sportsFollowedCount = profile.favouriteSportKeys.length
+  const mySubmissions = useMemo(() => submissions.filter((s) => s.createdByUserId === (user?.id ?? "")), [submissions, user?.id])
 
   const openEdit = useCallback(() => {
     setDraft({
@@ -355,6 +359,78 @@ export function ProfilePage() {
                     <p className="py-12 text-center text-sm text-muted-foreground">
                       Calendar entries will render here from your saved planner data.
                     </p>
+                  )}
+                </section>
+              ) : null}
+
+              {activeTab === "submissions" ? (
+                <section
+                  role="tabpanel"
+                  id="profile-tabpanel-submissions"
+                  aria-labelledby="profile-tab-submissions"
+                  className="outline-none"
+                >
+                  {mySubmissions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 px-6 py-16 text-center">
+                      <div className="mb-4 flex size-16 items-center justify-center rounded-full border border-primary/25 bg-primary/10">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" className="text-primary" aria-hidden="true">
+                          <path
+                            d="M12 5v14M5 12h14"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </div>
+                      <h2 className="text-lg font-bold text-foreground">No submissions yet</h2>
+                      <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                        Add an official race (needs approval) or publish a community race/event instantly.
+                      </p>
+                      <Link
+                        to="/add-race"
+                        className="mt-8 inline-flex rounded-full border border-primary/35 bg-primary/12 px-6 py-2.5 text-sm font-semibold text-primary transition hover:border-primary/55 hover:bg-primary/[0.16]"
+                      >
+                        Add race / event
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {mySubmissions.map((s) => (
+                        <div
+                          key={s.id}
+                          className="flex flex-col gap-3 rounded-2xl border border-border/45 bg-background/30 p-5 transition hover:border-primary/25 hover:bg-background/40 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-wider text-primary/90">{s.type.replace(/_/g, " ")}</p>
+                            <p className="mt-1 truncate text-base font-black text-foreground">{s.title}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {s.city}, {s.country} · {s.date} · {s.sport}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-wide ${
+                                s.status === "pending"
+                                  ? "border-primary/25 bg-primary/10 text-primary"
+                                  : s.status === "approved"
+                                    ? "border-[#22c55e]/25 bg-[#22c55e]/10 text-[#22c55e]"
+                                    : "border-red-400/25 bg-red-950/20 text-red-200"
+                              }`}
+                            >
+                              {s.status}
+                            </span>
+                            {s.status === "approved" ? (
+                              <Link
+                                to={`/race/${s.id}`}
+                                className="rounded-full border border-border/55 bg-secondary/35 px-4 py-2 text-xs font-semibold text-foreground transition hover:border-primary/25 hover:bg-secondary/55"
+                              >
+                                View
+                              </Link>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </section>
               ) : null}

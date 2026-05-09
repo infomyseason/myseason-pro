@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useSearchParams } from "react-router-dom"
-import { computeDaysUntilRace, MOCK_RACE_DETAILS, type MockRaceDetail } from "../../data"
+import { computeDaysUntilRace, loadApprovedSubmittedRaces, MOCK_RACE_DETAILS, type MockRaceDetail } from "../../data"
 import { EUROPEAN_COUNTRIES, EUROPE_FLAG_BY_CODE } from "../../data/europeanCountries"
 import { RaceCard } from "../../components/cards/RaceCard"
 import { Footer } from "../../components/Footer"
@@ -250,10 +250,13 @@ export function ExplorePage() {
     }
   }, [filtersDrawerOpen])
 
-  const filtered = useMemo(
-    () => filterExploreRaces(MOCK_RACE_DETAILS, applied, search),
-    [applied, search],
-  )
+  const exploreData = useMemo(() => {
+    // localStorage-backed submissions (approved only)
+    const submitted = loadApprovedSubmittedRaces()
+    return [...submitted, ...MOCK_RACE_DETAILS]
+  }, [searchParams])
+
+  const filtered = useMemo(() => filterExploreRaces(exploreData, applied, search), [exploreData, applied, search])
 
   const applySports = () => {
     const sports = [...draftSports]

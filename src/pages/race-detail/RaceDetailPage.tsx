@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { computeDaysUntilRace, getRaceDetailById } from "../../data"
+import { computeDaysUntilRace, getRaceDetailById, getSubmittedRaceDetailById } from "../../data"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
+import { useUserRaceLists } from "../../hooks/useUserRaceLists"
 import { SPORT_STYLES, sportKeyFromLabel } from "../../components/sportTokens"
 
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -28,9 +29,10 @@ function HeartIcon({ filled }: { filled: boolean }) {
 
 export function RaceDetailPage() {
   const { raceId } = useParams<{ raceId: string }>()
-  const race = raceId ? getRaceDetailById(raceId) : undefined
+  const race = raceId ? getRaceDetailById(raceId) ?? getSubmittedRaceDetailById(raceId) : undefined
   const [routeMapOpen, setRouteMapOpen] = useState(false)
   const { toggle, isFavourite } = useFavouriteRaceIds()
+  const { calendarRaceIds, setLists, plannedRaceIds, completedRaceIds } = useUserRaceLists()
 
   useEffect(() => {
     setRouteMapOpen(false)
@@ -92,6 +94,7 @@ export function RaceDetailPage() {
   const routeModalSrc = race.routeUrl ?? race.routeImage
   const routePreviewInteractive = race.hasRoute && Boolean(routePreviewSrc && routeModalSrc)
   const savedToFavourites = isFavourite(race.id)
+  const inCalendar = calendarRaceIds.includes(race.id)
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -198,17 +201,24 @@ export function RaceDetailPage() {
               </button>
               <button
                 type="button"
-                aria-disabled="true"
-                tabIndex={-1}
-                title="Calendar sync is coming soon"
-                onClick={(e) => e.preventDefault()}
-                className="inline-flex w-full cursor-default items-center justify-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.06] px-4 py-2.5 text-[13px] font-semibold text-muted-foreground/85 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors hover:border-white/[0.18] hover:bg-white/[0.1] hover:text-muted-foreground sm:w-auto"
+                onClick={() => {
+                  setLists({
+                    plannedRaceIds,
+                    completedRaceIds,
+                    calendarRaceIds: inCalendar
+                      ? calendarRaceIds.filter((id) => id !== race.id)
+                      : [...calendarRaceIds, race.id],
+                  })
+                }}
+                aria-pressed={inCalendar}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors sm:w-auto ${
+                  inCalendar
+                    ? "border border-primary/40 bg-primary/12 text-primary ring-1 ring-primary/20 hover:bg-primary/[0.16]"
+                    : "border border-white/[0.12] bg-white/[0.06] text-foreground hover:border-primary/25 hover:bg-white/[0.09]"
+                }`}
               >
                 <span aria-hidden="true">📅</span>
-                <span>Add to calendar</span>
-                <span className="rounded-md border border-white/[0.14] bg-black/30 px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                  Soon
-                </span>
+                <span>{inCalendar ? "Added to calendar" : "Add to calendar"}</span>
               </button>
             </div>
 

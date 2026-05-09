@@ -1,6 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import { RequireAdmin } from "./components/auth/RequireAdmin"
 import { RequireAuth } from "./components/auth/RequireAuth"
 import { ScrollToTopFab } from "./components/ScrollToTopFab"
+import { AddRacePage } from "./pages/add-race/AddRacePage"
+import { AdminPage } from "./pages/admin/AdminPage"
 import { CommunityPage } from "./pages/community/CommunityPage"
 import { ExplorePage } from "./pages/explore/ExplorePage"
 import { HomePage } from "./pages/home/HomePage"
@@ -19,8 +22,17 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/add-race" element={<AddRacePage />} />
         <Route path="/my-calendar" element={<MyCalendarPage />} />
         <Route path="/community" element={<CommunityPage />} />
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminPage />
+            </RequireAdmin>
+          }
+        />
         <Route path="/race/:raceId" element={<RaceDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />

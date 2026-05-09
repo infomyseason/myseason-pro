@@ -84,6 +84,24 @@ export function loadMockUsers(): MockRegisteredUser[] {
         typeof r.password === "string" ? r.password : coerceStoredString(r.password) ?? ""
       out.push({ id, loginName, email, password, displayName })
     }
+    // Seed admin account (local prototype only).
+    const adminEmail = "benilgys@gmail.com"
+    const hasAdmin = out.some((u) => normalizeAuthEmail(u.email) === normalizeAuthEmail(adminEmail))
+    if (!hasAdmin) {
+      const admin: MockRegisteredUser = {
+        id: "u_admin",
+        loginName: "admin",
+        email: adminEmail,
+        password: "Admin12.",
+        displayName: "Admin",
+      }
+      try {
+        saveMockUsers([...out, admin])
+        out.push(admin)
+      } catch {
+        // ignore storage failures
+      }
+    }
     return out
   } catch {
     return []
