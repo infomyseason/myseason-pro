@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { exploreHref } from "../../lib/exploreLinks"
 
 const FEATURE_HIGHLIGHTS = [
   {
@@ -73,7 +74,7 @@ export function HeroSection() {
   const onFeatureClick = useCallback(
     (action: (typeof FEATURE_HIGHLIGHTS)[number]["action"]) => {
       if (action === "explore-world-class") {
-        navigate(`/explore?eventType=${encodeURIComponent("World-class events")}`)
+        navigate(exploreHref({ sport: "Triathlon", eventType: "world_class" }))
         return
       }
       if (action === "calendar") {

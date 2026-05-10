@@ -1,8 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MOCK_RACES_LIST as MOCK_RACES } from "../../data"
+import { Link } from "react-router-dom"
+import { MOCK_RACE_DETAILS, MOCK_RACES_LIST as MOCK_RACES } from "../../data"
 import { EUROPEAN_COUNTRIES, EUROPE_FLAG_BY_CODE } from "../../data/europeanCountries"
+import { exploreHref } from "../../lib/exploreLinks"
+import { compareRaceDatesAscending } from "../../pages/explore/exploreFilters"
 import { RaceCard } from "../cards/RaceCard"
 import { sportKeyFromLabel } from "../sportTokens"
+import {
+  HOME_CAROUSEL_ARROW_CLASS,
+  homeCarouselScrollNextLoop,
+  homeCarouselScrollPrevLoop,
+} from "./homeCarouselUtils"
+import {
+  HOME_CARD_SLIDE,
+  HOME_RACE_CAROUSEL_STRIP,
+  HOME_SECTION_HEADER_ROW,
+  HOME_SECTION_INNER,
+  HOME_SECTION_PY,
+  HOME_VIEW_ALL_PILL,
+} from "./homeSectionLayout"
+
+const RACE_DATE_ISO_BY_LIST_ID = new Map(MOCK_RACE_DETAILS.map((d) => [d.id, d.date]))
+
+function sortRacesByEventDateSoonestFirst<T extends { id: string }>(items: T[]): T[] {
+  return items.slice().sort((a, b) => {
+    const da = RACE_DATE_ISO_BY_LIST_ID.get(a.id) ?? ""
+    const db = RACE_DATE_ISO_BY_LIST_ID.get(b.id) ?? ""
+    return compareRaceDatesAscending(da, db)
+  })
+}
 
 const FLAG_BY_CODE = EUROPE_FLAG_BY_CODE
 
@@ -60,18 +86,6 @@ function ChevronLeft({ className = "size-5" }: { className?: string }) {
   )
 }
 
-const CAROUSEL_ARROW_CLASS =
-  "pointer-events-auto absolute top-1/2 z-20 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-[#e8d4b0]/35 bg-[#0c1018]/65 text-[#f0e6d4] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_8px_32px_-12px_rgba(0,0,0,0.75)] backdrop-blur-xl transition hover:border-primary/40 hover:bg-[#0c1018]/78 hover:text-primary active:scale-[0.96] sm:size-11"
-
-function scrollStepPx(scrollEl: HTMLDivElement): number {
-  const first = scrollEl.firstElementChild as HTMLElement | undefined
-  if (!first) return 336
-  const style = getComputedStyle(scrollEl)
-  const gapRaw = style.columnGap || style.gap || "16px"
-  const gap = Number.parseFloat(gapRaw) || 16
-  return first.offsetWidth + gap
-}
-
 export function LocalRaces() {
   /** Country filter (ISO codes aligned with `EUROPEAN_COUNTRIES` / mock races). */
   const [selectedCountryCode, setSelectedCountryCode] =
@@ -86,34 +100,21 @@ export function LocalRaces() {
   const selectedCountryLabel = labelForCountryCode(selectedCountryCode)
 
   const filteredRaces = useMemo(() => {
-    if (selectedCountryCode === "ALL") return MOCK_RACES
-    return MOCK_RACES.filter((r) => r.countryCode === selectedCountryCode)
+    const base =
+      selectedCountryCode === "ALL" ? MOCK_RACES : MOCK_RACES.filter((r) => r.countryCode === selectedCountryCode)
+    return sortRacesByEventDateSoonestFirst(base)
   }, [selectedCountryCode])
 
   const scrollRacesPrev = useCallback(() => {
     const el = racesCarouselRef.current
     if (!el) return
-    const step = scrollStepPx(el)
-    const maxScroll = el.scrollWidth - el.clientWidth
-    const atStart = el.scrollLeft <= 2
-    if (atStart) {
-      el.scrollTo({ left: maxScroll, behavior: "smooth" })
-    } else {
-      el.scrollBy({ left: -step, behavior: "smooth" })
-    }
+    homeCarouselScrollPrevLoop(el)
   }, [])
 
   const scrollRacesNext = useCallback(() => {
     const el = racesCarouselRef.current
     if (!el) return
-    const step = scrollStepPx(el)
-    const maxScroll = el.scrollWidth - el.clientWidth
-    const atEnd = el.scrollLeft >= maxScroll - 2
-    if (atEnd) {
-      el.scrollTo({ left: 0, behavior: "smooth" })
-    } else {
-      el.scrollBy({ left: step, behavior: "smooth" })
-    }
+    homeCarouselScrollNextLoop(el)
   }, [])
 
   scrollRacesNextRef.current = scrollRacesNext
@@ -125,7 +126,7 @@ export function LocalRaces() {
   useEffect(() => {
     if (filteredRaces.length <= 1) return
     if (racesCarouselPaused) return
-    const id = window.setInterval(() => scrollRacesNextRef.current(), 3000)
+    const id = window.setInterval(() => scrollRacesNextRef.current(), 5000)
     return () => window.clearInterval(id)
   }, [filteredRaces.length, racesCarouselPaused, selectedCountryCode])
 
@@ -160,33 +161,30 @@ export function LocalRaces() {
     "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium backdrop-blur-xl transition-colors duration-200 md:gap-2 md:px-3 md:py-1.5 md:text-sm"
 
   return (
-    <section className="relative overflow-x-hidden border-t border-border/30 py-6 md:py-14">
+    <section className={`relative overflow-x-hidden border-t border-border/30 ${HOME_SECTION_PY}`}>
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute right-0 top-0 h-[420px] w-[420px] rounded-full bg-primary/5 blur-[100px]" />
         <div className="absolute bottom-0 left-0 h-[320px] w-[320px] rounded-full bg-[#3b82f6]/6 blur-[95px]" />
       </div>
 
-      <div className="relative z-10 mx-auto w-full min-w-0 max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <div className={HOME_SECTION_INNER}>
+        <div className={HOME_SECTION_HEADER_ROW}>
           <div className="min-w-0 max-w-full flex-1 sm:pr-4">
             <div className="mb-2 inline-flex max-w-full items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
               <span className="size-1 shrink-0 animate-pulse rounded-full bg-primary" />
               <span className="truncate">{eyebrow}</span>
             </div>
-            <h2 className="text-balance break-words text-xl font-black tracking-tight text-foreground sm:text-3xl md:text-4xl">
+            <h2 className="text-balance break-words text-xl font-black tracking-tight text-foreground sm:text-3xl md:text-5xl">
               {heading}
             </h2>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground md:text-base">
               {contextLine}
             </p>
           </div>
-          <a
-            href="#"
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start whitespace-nowrap rounded-full border border-primary/25 bg-primary/[0.07] px-4 py-2 text-sm font-semibold text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm transition hover:border-primary/40 hover:bg-primary/[0.11] sm:mt-1"
-          >
-            View all countries
+          <Link to={exploreHref({ eventType: "local" })} className={HOME_VIEW_ALL_PILL}>
+            View all
             <ChevronRight className="size-4 shrink-0 opacity-90" />
-          </a>
+          </Link>
         </div>
 
         <div className="mb-4 grid min-w-0 w-full max-w-full grid-cols-1 gap-2 md:mb-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-x-5 md:gap-y-2">
@@ -295,7 +293,7 @@ export function LocalRaces() {
                 type="button"
                 aria-label="Previous race"
                 aria-controls="local-races-carousel"
-                className={`${CAROUSEL_ARROW_CLASS} left-0 hidden sm:left-1 md:flex`}
+                className={`${HOME_CAROUSEL_ARROW_CLASS} left-0 flex sm:left-1`}
                 onClick={scrollRacesPrev}
               >
                 <ChevronLeft className="size-5 opacity-95 sm:size-[22px]" />
@@ -304,7 +302,7 @@ export function LocalRaces() {
                 type="button"
                 aria-label="Next race"
                 aria-controls="local-races-carousel"
-                className={`${CAROUSEL_ARROW_CLASS} right-0 hidden sm:right-1 md:flex`}
+                className={`${HOME_CAROUSEL_ARROW_CLASS} right-0 flex sm:right-1`}
                 onClick={scrollRacesNext}
               >
                 <ChevronRight className="size-5 opacity-95 sm:size-[22px]" />
@@ -317,16 +315,16 @@ export function LocalRaces() {
             role="region"
             aria-roledescription="carousel"
             aria-label={heading}
-            className="flex min-w-0 w-full max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth pb-3 [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide touch-pan-x md:gap-4"
+            className={`${HOME_RACE_CAROUSEL_STRIP} max-w-full`}
           >
             {filteredRaces.map((race) => (
               <div
                 key={race.id}
-                className="w-[calc((100vw-2rem)*0.91)] max-w-[320px] shrink-0 snap-start md:w-auto md:max-w-none"
+                className={HOME_CARD_SLIDE}
               >
                 <RaceCard
                   mode="local"
-                  compactListing
+                  homeMinimal
                   sportKey={sportKeyFromLabel(race.raceType)}
                   title={race.title}
                   locationLine={`${race.city}, ${race.countryName}`}
@@ -334,7 +332,6 @@ export function LocalRaces() {
                   dateLabel={race.dateLabel}
                   imageUrl={race.imageUrl}
                   distances={race.distances}
-                  daysUntil={race.daysUntil}
                   to={`/race/${race.id}`}
                   startingPriceLabel={homepagePriceLabel(race.startingPriceLabel)}
                   registrationStatus={race.registrationStatus}

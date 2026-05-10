@@ -1,5 +1,6 @@
 import type { MockRaceDetail } from "./mockRaces"
 import { computeDaysUntilRace } from "./mockRaces"
+import { filterRaceDetailsNotPast, isRaceDateNotPast } from "./raceDateFilters"
 
 type RaceSubmissionStatus = "pending" | "approved" | "rejected"
 type RaceSubmissionType = "official_race" | "community_race" | "community_event"
@@ -106,9 +107,10 @@ function loadSubmissions(): RaceSubmission[] {
 
 export function loadApprovedSubmittedRaces(): MockRaceDetail[] {
   const subs = loadSubmissions()
-  return subs
+  const rows = subs
     .filter((s) => s.status === "approved" && (s.type === "official_race" || s.type === "community_race"))
     .map((s) => submissionToMockRaceDetail(s))
+  return filterRaceDetailsNotPast(rows)
 }
 
 export function getSubmittedRaceDetailById(raceId: string): MockRaceDetail | undefined {
@@ -130,6 +132,7 @@ export function loadApprovedCommunityEvents(): Array<{
   date: string
   organizer: string
   participants: number
+  imageUrl?: string
 }> {
   const subs = loadSubmissions()
   return subs
@@ -144,7 +147,9 @@ export function loadApprovedCommunityEvents(): Array<{
       date: s.date,
       organizer: s.organizer ?? "Community",
       participants: s.estimatedParticipants ?? 0,
+      ...(s.imageUrl?.trim() ? { imageUrl: s.imageUrl.trim() } : {}),
     }))
+    .filter((e) => isRaceDateNotPast(e.date))
 }
 
 function submissionToMockRaceDetail(s: RaceSubmission): MockRaceDetail {

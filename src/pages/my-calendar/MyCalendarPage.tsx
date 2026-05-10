@@ -1,6 +1,12 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { computeDaysUntilRace, MOCK_RACE_DETAILS, type MockRaceDetail } from "../../data"
+import {
+  calendarIsoTodayLocal,
+  computeDaysUntilRace,
+  getSubmittedRaceDetailById,
+  MOCK_RACE_DETAILS_ALL,
+  type MockRaceDetail,
+} from "../../data"
 import { SPORT_STYLES, sportKeyFromLabel, type SportKey } from "../../components/sportTokens"
 import { EUROPE_FLAG_BY_CODE } from "../../data/europeanCountries"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
@@ -8,39 +14,14 @@ import { useUserRaceLists, type CalendarEntry, type CalendarGoalType } from "../
 import { formatRaceDateLabel } from "../explore/exploreFilters"
 import { Footer } from "../../components/Footer"
 import { HomeNavbar } from "../../components/marketing/HomeNavbar"
+import { triathlonFormatLabels } from "../../lib/triathlonFormats"
 
 type ViewMode = "timeline" | "upcoming" | "month"
 type CalendarGranularity = "monthly" | "yearly"
 
-function parseSegmentKm(distances: string[], segment: "swim" | "bike" | "run"): number | null {
-  const re = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*km\s*${segment}`, "i")
-  for (const d of distances) {
-    const m = d.match(re)
-    if (!m) continue
-    const v = Number(m[1])
-    if (Number.isFinite(v)) return v
-  }
-  return null
-}
-
-function triathlonFormatOptions(distances: string[]): string[] {
-  const swim = parseSegmentKm(distances, "swim")
-  const bike = parseSegmentKm(distances, "bike")
-  const run = parseSegmentKm(distances, "run")
-  if (swim === null || bike === null || run === null) return []
-
-  const within = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol
-  const formats: string[] = []
-  if (within(swim, 3.8, 0.35) && within(bike, 180, 12) && within(run, 42.2, 2.5)) formats.push("Ironman")
-  if (within(swim, 1.9, 0.25) && within(bike, 90, 8) && within(run, 21.1, 1.8)) formats.push("Ironman 70.3")
-  if (within(swim, 1.5, 0.2) && within(bike, 40, 5) && within(run, 10, 1.2)) formats.push("Olympic")
-  if (within(swim, 0.75, 0.15) && within(bike, 20, 3) && within(run, 5, 0.9)) formats.push("Sprint")
-  return formats
-}
-
 function planningDistanceOptions(race: { sport: string; distances: string[] }): string[] {
   if (race.sport === "Triathlon") {
-    const formats = triathlonFormatOptions(race.distances)
+    const formats = triathlonFormatLabels(race.distances)
     if (formats.length) return formats
   }
   return race.distances.length ? race.distances : ["Distance TBD"]
@@ -449,16 +430,23 @@ export function MyCalendarPage() {
   const [planGoal, setPlanGoal] = useState<CalendarGoalType | "">("")
   const [planNote, setPlanNote] = useState("")
 
-  const raceById = useMemo(() => new Map(MOCK_RACE_DETAILS.map((r) => [r.id, r])), [])
+  const mockRaceByIdAll = useMemo(() => new Map(MOCK_RACE_DETAILS_ALL.map((r) => [r.id, r])), [])
+
+  const resolveCalendarRace = useCallback(
+    (id: string) => mockRaceByIdAll.get(id) ?? getSubmittedRaceDetailById(id),
+    [mockRaceByIdAll],
+  )
 
   const calendarRows = useMemo(() => {
+    const cutoff = calendarIsoTodayLocal()
     const rows = calendarEntries
-      .map((e) => ({ entry: e, race: raceById.get(e.raceId) }))
+      .map((e) => ({ entry: e, race: resolveCalendarRace(e.raceId) }))
       .filter((r): r is { entry: CalendarEntry; race: MockRaceDetail } => Boolean(r.race))
+      .filter((r) => r.race.date >= cutoff)
       .slice()
       .sort((a, b) => a.race.date.localeCompare(b.race.date))
     return rows
-  }, [calendarEntries, raceById])
+  }, [calendarEntries, resolveCalendarRace])
 
   const calendarRaces = useMemo(() => calendarRows.map((r) => r.race), [calendarRows])
   const entryByRaceId = useMemo(() => new Map(calendarEntries.map((e) => [e.raceId, e] as const)), [calendarEntries])
@@ -539,10 +527,10 @@ export function MyCalendarPage() {
             </div>
 
             <div className="px-5 py-5">
-              {raceById.get(planRaceId) ? (
+              {planRaceId && resolveCalendarRace(planRaceId) ? (
                 <>
                   {(() => {
-                    const race = raceById.get(planRaceId)!
+                    const race = resolveCalendarRace(planRaceId)!
                     const options = planningDistanceOptions(race)
                     return (
                       <>
@@ -616,7 +604,7 @@ export function MyCalendarPage() {
                 disabled={!planDistance.trim()}
                 className="rounded-full bg-primary/90 px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/15 transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => {
-                  const race = raceById.get(planRaceId)
+                  const race = planRaceId ? resolveCalendarRace(planRaceId) : undefined
                   if (!race) return
                   const dist = planDistance.trim()
                   if (!dist) return

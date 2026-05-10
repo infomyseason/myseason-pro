@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { useRaceSubmissions, type RaceSubmission } from "../../hooks/useRaceSubmissions"
 import { Footer } from "../../components/Footer"
 import { HomeNavbar } from "../../components/marketing/HomeNavbar"
+import { AdminNewsImportSection } from "../../components/admin/AdminNewsImportSection"
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-border/55 bg-background/50 px-3 py-2.5 text-sm text-foreground outline-none ring-primary/15 placeholder:text-muted-foreground/55 focus:border-primary/40 focus:ring-2"
@@ -207,6 +208,8 @@ export function AdminPage() {
               )}
             </div>
           </section>
+
+          <AdminNewsImportSection />
 
           <section className="mt-6 rounded-3xl border border-border/45 bg-secondary/25 backdrop-blur-xl">
             <div className="border-b border-border/40 p-6 sm:p-8">

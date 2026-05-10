@@ -116,9 +116,10 @@ export function UpdatePasswordPage() {
         </label>
 
         <ul className="space-y-1 text-xs text-muted-foreground">
+          <li className={password.length >= 6 ? "text-emerald-400/90" : ""}>• At least 6 characters</li>
+          <li className={/[a-z]/.test(password) ? "text-emerald-400/90" : ""}>• One lowercase letter</li>
           <li className={/[A-Z]/.test(password) ? "text-emerald-400/90" : ""}>• One uppercase letter</li>
-          <li className={(password.match(/\d/g) ?? []).length >= 2 ? "text-emerald-400/90" : ""}>• Two numbers</li>
-          <li className={/[^A-Za-z0-9]/.test(password) ? "text-emerald-400/90" : ""}>• One special symbol</li>
+          <li className={/\d/.test(password) ? "text-emerald-400/90" : ""}>• One number</li>
         </ul>
         {password.length > 0 && pwdHints.length > 0 ? (
           <p className="text-xs text-amber-200/80">{pwdHints.join(" ")}</p>

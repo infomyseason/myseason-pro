@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { EXPLORE_EVENT_TYPE_LABELS } from "../../pages/explore/exploreFilters"
+import { isRaceDateNotPast } from "../../data"
+import { exploreHref } from "../../lib/exploreLinks"
+import { triathlonCardFormatChip } from "../../lib/triathlonFormats"
 import { RaceCard } from "../cards/RaceCard"
 import { sportKeyFromLabel } from "../sportTokens"
-
-function featuredScrollStepPx(scrollEl: HTMLDivElement): number {
-  const first = scrollEl.firstElementChild as HTMLElement | undefined
-  if (!first) return 420
-  const style = getComputedStyle(scrollEl)
-  const gapRaw = style.columnGap || style.gap || "20px"
-  const gap = Number.parseFloat(gapRaw) || 20
-  return first.offsetWidth + gap
-}
+import {
+  HOME_CAROUSEL_ARROW_CLASS,
+  homeCarouselScrollNextLoop,
+  homeCarouselScrollPrevLoop,
+} from "./homeCarouselUtils"
+import {
+  HOME_CARD_SLIDE_WIDE,
+  HOME_RACE_CAROUSEL_STRIP,
+  HOME_SECTION_HEADER_ROW,
+  HOME_SECTION_INNER,
+  HOME_SECTION_PY,
+  HOME_VIEW_ALL_LINK,
+} from "./homeSectionLayout"
 
 type FeaturedRace = {
   id: string
@@ -37,18 +43,40 @@ function formatFeaturedDate(iso: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(d)
 }
 
-function computeDaysUntilFeatured(iso: string): number {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const event = new Date(`${iso}T00:00:00`)
-  event.setHours(0, 0, 0, 0)
-  return Math.ceil((event.getTime() - today.getTime()) / 86400000)
+function homepagePriceLabel(label?: string): string | undefined {
+  if (!label?.trim()) return undefined
+  return label.replace(/^starting\s+from\s+/i, "from ")
+}
+
+/** World-class strip: one chip — full Ironman vs 70.3 from swim/bike/run lines (not leg distances). */
+function worldClassCardDistances(race: FeaturedRace): string[] {
+  if (race.sportType !== "Triathlon") return race.distances
+  const chip = triathlonCardFormatChip(race.distances)
+  if (chip) return [chip]
+  if (/\b70\.3\b/i.test(race.title)) return ["Ironman 70.3"]
+  return ["Ironman"]
+}
+
+function ChevronRight({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ChevronLeft({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
 }
 
 /**
  * European IRONMAN full-distance events — dates, imagery and URLs from official ironman.com race pages (structured data).
  */
-const FEATURED_RACES: FeaturedRace[] = [
+const FEATURED_RACES_RAW: FeaturedRace[] = [
   {
     id: "im-hamburg-european-championship",
     title: "IRONMAN Hamburg European Championship",
@@ -179,6 +207,10 @@ const FEATURED_RACES: FeaturedRace[] = [
   },
 ]
 
+const FEATURED_RACES = FEATURED_RACES_RAW.filter((r) => isRaceDateNotPast(r.dateIso))
+  .slice()
+  .sort((a, b) => a.dateIso.localeCompare(b.dateIso))
+
 export function WorldClassEvents() {
   const stripRef = useRef<HTMLDivElement>(null)
   const [featuredPaused, setFeaturedPaused] = useState(false)
@@ -187,27 +219,13 @@ export function WorldClassEvents() {
   const scrollFeaturedPrev = useCallback(() => {
     const el = stripRef.current
     if (!el) return
-    const step = featuredScrollStepPx(el)
-    const maxScroll = el.scrollWidth - el.clientWidth
-    const atStart = el.scrollLeft <= 2
-    if (atStart) {
-      el.scrollTo({ left: maxScroll, behavior: "smooth" })
-    } else {
-      el.scrollBy({ left: -step, behavior: "smooth" })
-    }
+    homeCarouselScrollPrevLoop(el)
   }, [])
 
   const scrollFeaturedNext = useCallback(() => {
     const el = stripRef.current
     if (!el) return
-    const step = featuredScrollStepPx(el)
-    const maxScroll = el.scrollWidth - el.clientWidth
-    const atEnd = el.scrollLeft >= maxScroll - 2
-    if (atEnd) {
-      el.scrollTo({ left: 0, behavior: "smooth" })
-    } else {
-      el.scrollBy({ left: step, behavior: "smooth" })
-    }
+    homeCarouselScrollNextLoop(el)
   }, [])
 
   scrollFeaturedNextRef.current = scrollFeaturedNext
@@ -215,101 +233,88 @@ export function WorldClassEvents() {
   useEffect(() => {
     if (FEATURED_RACES.length <= 1) return
     if (featuredPaused) return
-    const id = window.setInterval(() => scrollFeaturedNextRef.current(), 3000)
+    const id = window.setInterval(() => scrollFeaturedNextRef.current(), 5000)
     return () => window.clearInterval(id)
-  }, [featuredPaused])
+  }, [featuredPaused, FEATURED_RACES.length])
 
   return (
-    <section className="relative overflow-hidden border-t border-border/30 py-10 md:py-20">
+    <section className={`relative overflow-hidden border-t border-border/30 ${HOME_SECTION_PY}`}>
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-0 top-0 h-[400px] w-[400px] rounded-full bg-[#a855f7]/5 blur-[100px]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4">
-        <div className="mb-5 flex flex-col gap-3 md:mb-8 md:flex-row md:items-end md:justify-between md:gap-4">
+      <div className={HOME_SECTION_INNER}>
+        <div className={HOME_SECTION_HEADER_ROW}>
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary md:mb-3 md:px-3 md:py-1 md:text-xs">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary md:mb-3 md:px-3 md:py-1 md:text-xs">
               <span className="text-[10px]" aria-hidden="true">
                 ◆
               </span>
               Featured Events
             </div>
-            <h2 className="text-xl font-black text-foreground md:text-5xl">World-class events</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground md:mt-2 md:text-lg">
+            <h2 className="text-xl font-black tracking-tight text-foreground md:text-5xl">World-class events</h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground md:mt-2 md:text-lg">
               Official IRONMAN full-distance racing across Europe
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="hidden items-center gap-2 md:flex">
+          <Link
+            to={exploreHref({ sport: "Triathlon", eventType: "world_class" })}
+            className={`${HOME_VIEW_ALL_LINK} self-start md:self-auto`}
+          >
+            View all
+            <ChevronRight className="size-4 shrink-0" />
+          </Link>
+        </div>
+
+        <div
+          className="relative min-w-0"
+          onMouseEnter={() => setFeaturedPaused(true)}
+          onMouseLeave={() => setFeaturedPaused(false)}
+        >
+          {FEATURED_RACES.length > 1 ? (
+            <>
               <button
                 type="button"
                 aria-label="Scroll to previous events"
                 aria-controls="world-class-events-strip"
+                className={`${HOME_CAROUSEL_ARROW_CLASS} left-0 flex sm:left-1`}
                 onClick={scrollFeaturedPrev}
-                className="rounded-full border border-border/50 bg-secondary/50 p-2.5 text-foreground backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-secondary disabled:pointer-events-none disabled:opacity-35"
               >
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-                  <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                <ChevronLeft className="size-5 opacity-95 sm:size-[22px]" />
               </button>
               <button
                 type="button"
                 aria-label="Scroll to next events"
                 aria-controls="world-class-events-strip"
+                className={`${HOME_CAROUSEL_ARROW_CLASS} right-0 flex sm:right-1`}
                 onClick={scrollFeaturedNext}
-                className="rounded-full border border-border/50 bg-secondary/50 p-2.5 text-foreground backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-secondary disabled:pointer-events-none disabled:opacity-35"
               >
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-                  <path d="m9 18 6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                <ChevronRight className="size-5 opacity-95 sm:size-[22px]" />
               </button>
-            </div>
-            <Link
-              to={`/explore?eventType=${encodeURIComponent(EXPLORE_EVENT_TYPE_LABELS.world_class)}`}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:text-primary/80 md:ml-2 md:px-4 md:py-2 md:text-sm"
-            >
-              World-class event
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
-                <path d="M14 3h7v7M10 14 21 3M21 3v7h-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </Link>
-          </div>
-        </div>
-
-        <div
-          className="relative"
-          onMouseEnter={() => setFeaturedPaused(true)}
-          onMouseLeave={() => setFeaturedPaused(false)}
-        >
+            </>
+          ) : null}
           <div
             ref={stripRef}
             id="world-class-events-strip"
             role="region"
             aria-label="World-class event cards"
-            className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth px-4 pb-4 [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide touch-pan-x md:gap-5"
+            className={HOME_RACE_CAROUSEL_STRIP}
           >
             {FEATURED_RACES.map((race) => (
-              <div
-                key={race.id}
-                className="relative w-[calc((100vw-2rem)*0.91)] max-w-[360px] shrink-0 snap-start md:w-auto md:max-w-none"
-              >
+              <div key={race.id} className={HOME_CARD_SLIDE_WIDE}>
                 <RaceCard
                   mode="featured"
+                  homeMinimal
                   sportKey={sportKeyFromLabel(race.sportType)}
                   title={race.title}
                   locationLine={`${race.city}, ${race.countryName}`}
                   flag={race.flag}
                   dateLabel={race.dateLabel}
                   imageUrl={race.imageUrl}
-                  distances={race.distances}
-                  daysUntil={computeDaysUntilFeatured(race.dateIso)}
-                  major
-                  athletesLabel={race.participantsLabel}
-                  extraBadge="Ironman"
-                  featuredBlurb={race.description}
+                  distances={worldClassCardDistances(race)}
                   to={`/race/${race.id}`}
-                  startingPriceLabel={race.startingPriceLabel}
+                  startingPriceLabel={homepagePriceLabel(race.startingPriceLabel)}
                 />
               </div>
             ))}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../../auth/useAuth"
 import { AuthPageShell } from "../../components/auth/AuthPageShell"
@@ -7,6 +7,14 @@ import { supabase } from "../../lib/supabase"
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-border/55 bg-background/90 px-4 py-2.5 text-sm text-foreground outline-none ring-primary/15 placeholder:text-muted-foreground/45 focus:border-primary/40 focus:ring-2"
+
+const FIELD_TAKEN = " border-amber-600/60 focus:border-amber-600/70"
+
+function emailReadyForAvailabilityCheck(raw: string): boolean {
+  const t = raw.trim()
+  const parts = t.split("@")
+  return parts.length === 2 && parts[0].length >= 1 && parts[1].length >= 1
+}
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -19,12 +27,72 @@ export function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState(false)
+  const [takenLogin, setTakenLogin] = useState(false)
+  const [takenDisplay, setTakenDisplay] = useState(false)
+  const [takenEmail, setTakenEmail] = useState(false)
+  const [checkingIdentity, setCheckingIdentity] = useState(false)
+  const identityReq = useRef(0)
 
   useEffect(() => {
     if (!loading && isLoggedIn) navigate("/profile", { replace: true })
   }, [isLoggedIn, loading, navigate])
 
+  useEffect(() => {
+    const login = loginName.trim()
+    const display = displayName.trim()
+    const mail = email.trim()
+
+    const wantLogin = login.length >= 1
+    const wantDisplay = display.length >= 1
+    const wantEmail = emailReadyForAvailabilityCheck(mail)
+
+    if (!wantLogin && !wantDisplay && !wantEmail) {
+      setTakenLogin(false)
+      setTakenDisplay(false)
+      setTakenEmail(false)
+      setCheckingIdentity(false)
+      return
+    }
+
+    const delay = setTimeout(() => {
+      const req = ++identityReq.current
+      setCheckingIdentity(true)
+
+      void (async () => {
+        const { data: idCheck, error: rpcErr } = await supabase.rpc("signup_identity_available", {
+          p_login: login,
+          p_display: display,
+          p_email: mail,
+        })
+
+        if (identityReq.current !== req) return
+
+        setCheckingIdentity(false)
+
+        if (rpcErr) {
+          setTakenLogin(false)
+          setTakenDisplay(false)
+          setTakenEmail(false)
+          return
+        }
+
+        const check = idCheck as {
+          login_available?: boolean
+          display_available?: boolean
+          email_available?: boolean
+        } | null
+
+        setTakenLogin(wantLogin && check?.login_available !== true)
+        setTakenDisplay(wantDisplay && check?.display_available !== true)
+        setTakenEmail(wantEmail && check?.email_available !== true)
+      })()
+    }, 420)
+
+    return () => clearTimeout(delay)
+  }, [loginName, displayName, email])
+
   const pwdHints = validatePasswordRules(password)
+  const identityBlocked = takenLogin || takenDisplay || takenEmail
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -46,6 +114,11 @@ export function RegisterPage() {
       return
     }
 
+    if (identityBlocked) {
+      setError("Choose a login name, display name, and email that are not already used.")
+      return
+    }
+
     const pwdErrors = validatePasswordRules(passwordVal)
     if (pwdErrors.length > 0) {
       setError(pwdErrors.join(" "))
@@ -54,19 +127,37 @@ export function RegisterPage() {
 
     setSubmitting(true)
 
-    const { data: available, error: rpcErr } = await supabase.rpc("login_name_available", {
+    const { data: idCheck, error: rpcErr } = await supabase.rpc("signup_identity_available", {
       p_login: loginNameVal,
+      p_display: displayNameVal,
+      p_email: emailVal,
     })
 
     if (rpcErr) {
       setSubmitting(false)
-      setError(rpcErr.message || "Could not validate login name.")
+      setError(rpcErr.message || "Could not validate login name, display name, or email.")
       return
     }
 
-    if (available !== true) {
+    const check = idCheck as {
+      login_available?: boolean
+      display_available?: boolean
+      email_available?: boolean
+    } | null
+
+    if (check?.login_available !== true) {
       setSubmitting(false)
       setError("Login name already taken.")
+      return
+    }
+    if (check?.display_available !== true) {
+      setSubmitting(false)
+      setError("Display name already taken.")
+      return
+    }
+    if (check?.email_available !== true) {
+      setSubmitting(false)
+      setError("Email already registered.")
       return
     }
 
@@ -80,7 +171,18 @@ export function RegisterPage() {
     setSubmitting(false)
 
     if (res.error) {
-      setError(res.error.message)
+      const msg = res.error.message.toLowerCase()
+      if (
+        msg.includes("already registered") ||
+        msg.includes("already been registered") ||
+        msg.includes("user already exists")
+      ) {
+        setError("Email already registered.")
+      } else if (msg.includes("duplicate key") || msg.includes("unique constraint")) {
+        setError("That login name, display name, or email is already in use.")
+      } else {
+        setError(res.error.message)
+      }
       return
     }
 
@@ -107,9 +209,19 @@ export function RegisterPage() {
             name="loginName"
             autoComplete="username"
             value={loginName}
-            onChange={(e) => setLoginName(e.target.value)}
-            className={FIELD_CLASS}
+            onChange={(e) => {
+              setLoginName(e.target.value)
+              setTakenLogin(false)
+            }}
+            className={FIELD_CLASS + (takenLogin ? FIELD_TAKEN : "")}
           />
+          {takenLogin ? (
+            <p className="mt-1.5 text-xs text-amber-200/95" role="status">
+              Already used
+            </p>
+          ) : checkingIdentity && loginName.trim().length >= 1 ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">Checking…</p>
+          ) : null}
         </label>
 
         <label className="block">
@@ -119,9 +231,19 @@ export function RegisterPage() {
             name="email"
             autoComplete="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={FIELD_CLASS}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setTakenEmail(false)
+            }}
+            className={FIELD_CLASS + (takenEmail ? FIELD_TAKEN : "")}
           />
+          {takenEmail ? (
+            <p className="mt-1.5 text-xs text-amber-200/95" role="status">
+              Already used
+            </p>
+          ) : checkingIdentity && emailReadyForAvailabilityCheck(email) ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">Checking…</p>
+          ) : null}
         </label>
 
         <label className="block">
@@ -133,9 +255,19 @@ export function RegisterPage() {
             name="displayName"
             autoComplete="nickname"
             value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className={FIELD_CLASS}
+            onChange={(e) => {
+              setDisplayName(e.target.value)
+              setTakenDisplay(false)
+            }}
+            className={FIELD_CLASS + (takenDisplay ? FIELD_TAKEN : "")}
           />
+          {takenDisplay ? (
+            <p className="mt-1.5 text-xs text-amber-200/95" role="status">
+              Already used
+            </p>
+          ) : checkingIdentity && displayName.trim().length >= 1 ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">Checking…</p>
+          ) : null}
         </label>
 
         <label className="block">
@@ -151,9 +283,10 @@ export function RegisterPage() {
             className={FIELD_CLASS}
           />
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <li className={password.length >= 6 ? "text-emerald-400/90" : ""}>• At least 6 characters</li>
+            <li className={/[a-z]/.test(password) ? "text-emerald-400/90" : ""}>• One lowercase letter</li>
             <li className={/[A-Z]/.test(password) ? "text-emerald-400/90" : ""}>• One uppercase letter</li>
-            <li className={(password.match(/\d/g) ?? []).length >= 2 ? "text-emerald-400/90" : ""}>• Two numbers</li>
-            <li className={/[^A-Za-z0-9]/.test(password) ? "text-emerald-400/90" : ""}>• One special symbol</li>
+            <li className={/\d/.test(password) ? "text-emerald-400/90" : ""}>• One number</li>
           </ul>
           {password.length > 0 && pwdHints.length > 0 ? (
             <p className="mt-2 text-xs text-amber-200/80">{pwdHints.join(" ")}</p>
@@ -177,7 +310,7 @@ export function RegisterPage() {
 
         <button
           type="submit"
-          disabled={submitting || loading || pendingConfirm}
+          disabled={submitting || loading || pendingConfirm || identityBlocked}
           className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/15 transition hover:bg-primary/90 disabled:opacity-60"
         >
           {submitting ? "Creating…" : "Register"}

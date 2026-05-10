@@ -1,3 +1,6 @@
+import { HYROX_EVENTS_EUROPE_2026 } from "./hyroxEvents"
+import { filterRaceDetailsNotPast } from "./raceDateFilters"
+
 export type RacePricingTier = {
   distance: string
   /** e.g. "from €13" or "up to €74 with extra options" */
@@ -843,6 +846,158 @@ export const IRONMAN_EUROPE_FULL_DISTANCE_2026: MockRaceDetail[] = [
   },
 ]
 
+const CYCL_IMG_ROAD =
+  "https://images.unsplash.com/photo-1541625602330-2277d4c61895?w=1200&auto=format&fit=crop&q=80"
+const CYCL_IMG_GRAVEL =
+  "https://images.unsplash.com/photo-1596730749249-da817dcd782d?w=1200&auto=format&fit=crop&q=80"
+
+/** European gran fondo / sportive fixtures (mock — drives Home cycling carousel & Explore). */
+export const CYCLING_EVENTS_EUROPE_2026: MockRaceDetail[] = [
+  {
+    id: "gran-fondo-noord-holland-2026",
+    title: "Gran Fondo Noord-Holland",
+    sport: "Cycling",
+    category: "Gran fondo",
+    country: "Netherlands",
+    countryCode: "NL",
+    city: "Alkmaar",
+    date: "2026-06-14",
+    distances: ["175 km", "120 km", "75 km"],
+    courseProfile: ["Flat Dutch ribbons", "Wind tactics", "Peloton-friendly sportive"],
+    courseRoute: {
+      elevationGain: "~180m",
+      layoutType: "Northern Holland loops · dykes & polders",
+      surface: "Road",
+      profileSummary: "Fast / exposed",
+      startFinish: "Alkmaar centrum",
+    },
+    hasRoute: true,
+    routeImage: CYCL_IMG_ROAD,
+    routeUrl: CYCL_IMG_ROAD,
+    image: CYCL_IMG_ROAD,
+    description:
+      "A signature Dutch gran fondo built for rhythm riders — long straightaways, trademark wind sections, and café-stop culture between efforts. Three distances keep it approachable while the full route rewards smart drafting and steady fueling.",
+    participants: 4200,
+    pricing: [
+      { distance: "175 km", priceNote: "from €89" },
+      { distance: "120 km", priceNote: "from €69" },
+      { distance: "75 km", priceNote: "from €49" },
+    ],
+    startingPriceLabel: "Starting from €49",
+    registrationStatus: "open",
+    officialWebsite: "https://example.com/gran-fondo-noord-holland",
+    isOfficial: false,
+  },
+  {
+    id: "sportful-dolomiti-gran-fondo-2026",
+    title: "Sportful Dolomiti Gran Fondo",
+    sport: "Cycling",
+    category: "Mountain gran fondo",
+    country: "Italy",
+    countryCode: "IT",
+    city: "Feltre",
+    date: "2026-06-21",
+    distances: ["203 km", "138 km", "86 km"],
+    courseProfile: ["Alpine cols", "Spectacular vistas", "European sportive classic"],
+    courseRoute: {
+      elevationGain: "~4,800m (long route)",
+      layoutType: "Dolomiti passes · timed sectors optional",
+      surface: "Road",
+      profileSummary: "Climbing-heavy",
+      startFinish: "Feltre historic centre",
+    },
+    hasRoute: true,
+    routeImage:
+      "https://images.unsplash.com/photo-1511994298241-ec608ad637bd?w=1200&auto=format&fit=crop&q=80",
+    routeUrl:
+      "https://images.unsplash.com/photo-1511994298241-ec608ad637bd?w=2000&auto=format&fit=crop&q=80",
+    image:
+      "https://images.unsplash.com/photo-1511994298241-ec608ad637bd?w=1200&auto=format&fit=crop&q=80",
+    description:
+      "High-alpine kilometres and hairpin theatre — the kind of day where gearing choices and pacing plans matter as much as watts. Shorter routes keep the Dolomiti flavour without the full monument distance.",
+    participants: 5500,
+    pricing: [
+      { distance: "203 km", priceNote: "from €115" },
+      { distance: "138 km", priceNote: "from €95" },
+      { distance: "86 km", priceNote: "from €75" },
+    ],
+    startingPriceLabel: "Starting from €75",
+    registrationStatus: "open",
+    officialWebsite: "https://example.com/sportful-dolomiti",
+    isOfficial: false,
+  },
+  {
+    id: "mallorca-312-sportive-2026",
+    title: "Mallorca 312 Sportive",
+    sport: "Cycling",
+    category: "Sportive",
+    country: "Spain",
+    countryCode: "ES",
+    city: "Platja de Muro",
+    date: "2026-09-06",
+    distances: ["312 km", "225 km", "167 km"],
+    courseProfile: ["Island roads", "Early-season training camp favourite", "International peloton"],
+    courseRoute: {
+      elevationGain: "~5,000m (312 route)",
+      layoutType: "Mallorca perimeter & mountain arcs",
+      surface: "Road",
+      profileSummary: "Rolling with major climbs",
+      startFinish: "Platja de Muro",
+    },
+    hasRoute: false,
+    showCoursePendingNotice: true,
+    image:
+      "https://images.unsplash.com/photo-1444491741275-3747c884c049?w=1200&auto=format&fit=crop&q=80",
+    description:
+      "The Balearic headline sportive — long sunshine kilometres, trademark climbs, and a festival atmosphere that draws riders from every timezone. Check the official rider guide for feed zones and cut-offs before committing to the full loop.",
+    participants: 8000,
+    pricing: [
+      { distance: "312 km", priceNote: "from €129" },
+      { distance: "225 km", priceNote: "from €109" },
+      { distance: "167 km", priceNote: "from €89" },
+    ],
+    startingPriceLabel: "Starting from €89",
+    registrationStatus: "closingSoon",
+    officialWebsite: "https://example.com/mallorca-312",
+    isOfficial: false,
+  },
+  {
+    id: "strade-gravel-scandinavia-2026",
+    title: "Strade Gravel Scandinavia",
+    sport: "Cycling",
+    category: "Gravel fondo",
+    country: "Sweden",
+    countryCode: "SE",
+    city: "Gothenburg",
+    date: "2026-08-16",
+    distances: ["140 km", "95 km", "55 km"],
+    courseProfile: ["Mixed surface", "Forest lakes", "Nordic gravel scene"],
+    courseRoute: {
+      elevationGain: "~1,600m (long route)",
+      layoutType: "Lake district gravel ribbons",
+      surface: "Gravel & hardpack",
+      profileSummary: "Rolling forest roads",
+      startFinish: "Gothenburg outskirts",
+    },
+    hasRoute: true,
+    routeImage: CYCL_IMG_GRAVEL,
+    routeUrl: CYCL_IMG_GRAVEL,
+    image: CYCL_IMG_GRAVEL,
+    description:
+      "Scandinavian gravel fondo energy — quieter roads, changing surfaces, and punchy rollers that reward tyre choice and bike handling. Mid-August light makes for long cafe-neutral kilometres between timed segments.",
+    participants: 2100,
+    pricing: [
+      { distance: "140 km", priceNote: "from €79" },
+      { distance: "95 km", priceNote: "from €59" },
+      { distance: "55 km", priceNote: "from €39" },
+    ],
+    startingPriceLabel: "Starting from €39",
+    registrationStatus: "open",
+    officialWebsite: "https://example.com/strade-gravel-scandinavia",
+    isOfficial: false,
+  },
+]
+
 /** Upcoming Lithuanian triathlon / multisport fixtures from the 2026 LTF calendar & Lietuvos Triatlono Taurė (May 8 2026 onward). */
 export const LT_TRIATHLON_EVENTS_2026_UPCOMING: MockRaceDetail[] = [
   LT_SPRINT_POOL_CHAMPIONSHIP_PANEVEZYS_2026,
@@ -859,17 +1014,28 @@ export const LT_TRIATHLON_EVENTS_2026_UPCOMING: MockRaceDetail[] = [
   LTT_DRUSKININKAI_2026,
 ]
 
-export const MOCK_RACE_DETAILS: MockRaceDetail[] = [
+/** Full catalogue (includes past dates — used only where archives matter). */
+export const MOCK_RACE_DETAILS_ALL: MockRaceDetail[] = [
   SWEDBANK_VILNIUS_MARATHON,
   TEMPLE_KAUNO_PUSMARATONIS_2026,
   PINK_RUN_SU_ANTEJA_2026,
   RIMI_RIGA_MARATHON_2026,
+  ...CYCLING_EVENTS_EUROPE_2026,
   ...LT_TRIATHLON_EVENTS_2026_UPCOMING,
   ...IRONMAN_EUROPE_FULL_DISTANCE_2026,
+  ...HYROX_EVENTS_EUROPE_2026,
 ]
+
+/** Upcoming/on-day races only — drives Explore, Home, calendar lookups, and `/race/:id` for mock data. */
+export const MOCK_RACE_DETAILS: MockRaceDetail[] = filterRaceDetailsNotPast(MOCK_RACE_DETAILS_ALL)
 
 export function getRaceDetailById(id: string): MockRaceDetail | undefined {
   return MOCK_RACE_DETAILS.find((r) => r.id === id)
+}
+
+/** Resolve a mock race including ended events (e.g. calendar/history). */
+export function getRaceDetailByIdIncludingPast(id: string): MockRaceDetail | undefined {
+  return MOCK_RACE_DETAILS_ALL.find((r) => r.id === id)
 }
 
 function detailToListItem(d: MockRaceDetail): MockRaceListItem {

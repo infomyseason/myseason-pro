@@ -1,7 +1,9 @@
 export {
   computeDaysUntilRace,
   getRaceDetailById,
+  getRaceDetailByIdIncludingPast,
   MOCK_RACE_DETAILS,
+  MOCK_RACE_DETAILS_ALL,
   IRONMAN_EUROPE_FULL_DISTANCE_2026,
   MOCK_RACES_LIST,
   LT_TRIATHLON_EVENTS_2026_UPCOMING,
@@ -17,5 +19,9 @@ export {
   type RaceCourseRoute,
   type RacePricingTier,
 } from "./mockRaces"
+
+export { calendarIsoTodayLocal, filterRaceDetailsNotPast, isRaceDateNotPast } from "./raceDateFilters"
+
+export { HYROX_EVENTS_EUROPE_2026 } from "./hyroxEvents"
 
 export { loadApprovedCommunityEvents, loadApprovedSubmittedRaces, getSubmittedRaceDetailById } from "./submittedRaces"

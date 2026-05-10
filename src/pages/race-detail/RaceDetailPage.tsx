@@ -6,36 +6,11 @@ import { useRequireLoginAction } from "../../hooks/useRequireLoginAction"
 import { useUserRaceLists, type CalendarEntry } from "../../hooks/useUserRaceLists"
 import { useRaceSubmissions } from "../../hooks/useRaceSubmissions"
 import { SPORT_STYLES, sportKeyFromLabel } from "../../components/sportTokens"
-
-function parseSegmentKm(distances: string[], segment: "swim" | "bike" | "run"): number | null {
-  const re = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*km\s*${segment}`, "i")
-  for (const d of distances) {
-    const m = d.match(re)
-    if (!m) continue
-    const v = Number(m[1])
-    if (Number.isFinite(v)) return v
-  }
-  return null
-}
-
-function triathlonFormatOptions(distances: string[]): string[] {
-  const swim = parseSegmentKm(distances, "swim")
-  const bike = parseSegmentKm(distances, "bike")
-  const run = parseSegmentKm(distances, "run")
-  if (swim === null || bike === null || run === null) return []
-
-  const within = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol
-  const formats: string[] = []
-  if (within(swim, 3.8, 0.35) && within(bike, 180, 12) && within(run, 42.2, 2.5)) formats.push("Ironman")
-  if (within(swim, 1.9, 0.25) && within(bike, 90, 8) && within(run, 21.1, 1.8)) formats.push("Ironman 70.3")
-  if (within(swim, 1.5, 0.2) && within(bike, 40, 5) && within(run, 10, 1.2)) formats.push("Olympic")
-  if (within(swim, 0.75, 0.15) && within(bike, 20, 3) && within(run, 5, 0.9)) formats.push("Sprint")
-  return formats
-}
+import { triathlonFormatLabels } from "../../lib/triathlonFormats"
 
 function planningDistanceOptions(race: { sport: string; distances: string[] }): string[] {
   if (race.sport === "Triathlon") {
-    const formats = triathlonFormatOptions(race.distances)
+    const formats = triathlonFormatLabels(race.distances)
     if (formats.length) return formats
   }
   return race.distances.length ? race.distances : ["Distance TBD"]

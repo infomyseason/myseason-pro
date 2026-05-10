@@ -5,6 +5,7 @@ import { ScrollToTopFab } from "./components/ScrollToTopFab"
 import { ScrollToTopOnRouteChange } from "./components/ScrollToTopOnRouteChange"
 import { AddRacePage } from "./pages/add-race/AddRacePage"
 import { AdminPage } from "./pages/admin/AdminPage"
+import { ClubDetailPage } from "./pages/community/ClubDetailPage"
 import { CommunityPage } from "./pages/community/CommunityPage"
 import { ExplorePage } from "./pages/explore/ExplorePage"
 import { HomePage } from "./pages/home/HomePage"
@@ -35,6 +36,7 @@ function App() {
           }
         />
         <Route path="/community" element={<CommunityPage />} />
+        <Route path="/community/club-details/:clubId" element={<ClubDetailPage />} />
         <Route
           path="/admin"
           element={

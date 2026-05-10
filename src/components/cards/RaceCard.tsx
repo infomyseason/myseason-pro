@@ -35,6 +35,8 @@ type RaceCardProps = {
   startingPriceLabel?: string
   /** Homepage-style listing: fewer badges, capped distances, stronger image fade. */
   compactListing?: boolean
+  /** Home page only: image strip + distances (max 2 + count), title, date, price-from; registration + favourite top-right. */
+  homeMinimal?: boolean
 }
 
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -80,6 +82,7 @@ export function RaceCard({
   featuredBlurb,
   startingPriceLabel,
   compactListing = false,
+  homeMinimal = false,
 }: RaceCardProps) {
   const sport = SPORT_STYLES[sportKey]
   const { toggle, isFavourite } = useFavouriteRaceIds()
@@ -88,18 +91,26 @@ export function RaceCard({
   const fav = favId ? isFavourite(favId) : false
   const hoverShadow = `hover:shadow-[0_0_60px_rgba(${sport.rgb},0.3)]`
   const restDistances = distances.length > 2 ? distances.length - 2 : 0
+  const homeMinimalDistances = homeMinimal ? distances.slice(0, 2) : distances
+  const homeMinimalRest = homeMinimal && distances.length > 2 ? distances.length - 2 : 0
+  const useCompactFade = compactListing && !homeMinimal
 
   const sizeClass =
-    layout === "grid"
-      ? "w-full h-[300px] sm:h-[320px] md:h-[340px]"
-      : mode === "featured"
-        ? "h-[340px] w-[min(100%,340px)] md:h-[380px] md:w-[400px]"
-        : mode === "local"
-          ? "h-[300px] w-[min(100%,280px)] md:w-[320px]"
-          : "h-[280px] w-[min(100%,280px)] md:w-[300px]"
+    homeMinimal && layout === "carousel"
+      ? mode === "featured"
+        ? "h-[272px] w-[min(100%,340px)] md:h-[288px] md:w-[360px]"
+        : "h-[268px] w-[min(100%,300px)] md:h-[276px] md:w-[320px]"
+      : layout === "grid"
+        ? "w-full h-[300px] sm:h-[320px] md:h-[340px]"
+        : mode === "featured"
+          ? "h-[340px] w-[min(100%,340px)] md:h-[380px] md:w-[400px]"
+          : mode === "local"
+            ? "h-[300px] w-[min(100%,280px)] md:w-[320px]"
+            : "h-[280px] w-[min(100%,280px)] md:w-[300px]"
 
-  const titleClass =
-    mode === "featured"
+  const titleClass = homeMinimal
+    ? "text-[1.125rem] sm:text-xl md:text-xl"
+    : mode === "featured"
       ? "text-2xl md:text-3xl"
       : mode === "local"
         ? "text-xl"
@@ -121,20 +132,22 @@ export function RaceCard({
           />
           <div
             className={
-              compactListing
+              homeMinimal || useCompactFade
                 ? "absolute inset-0 bg-gradient-to-t from-[#050917] via-[#070b16]/95 to-[#0f1a2e]/35"
                 : "absolute inset-0 bg-gradient-to-t from-[#070b16] via-[#070b16]/60 to-[#0f1a2e]/22"
             }
           />
-          <div
-            className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-            style={{
-              background: `linear-gradient(to bottom right, ${sport.hex}66, transparent)`,
-            }}
-          />
+          {!homeMinimal ? (
+            <div
+              className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+              style={{
+                background: `linear-gradient(to bottom right, ${sport.hex}66, transparent)`,
+              }}
+            />
+          ) : null}
           <div
             className={
-              compactListing
+              homeMinimal || useCompactFade
                 ? "absolute inset-0 bg-[radial-gradient(ellipse_at_center_top,transparent_30%,rgba(2,4,8,0.65)_100%)]"
                 : "absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(10,14,26,0.3)_100%)]"
             }
@@ -146,6 +159,60 @@ export function RaceCard({
           style={{ backgroundColor: sport.hex }}
         />
 
+        {homeMinimal ? (
+          <div className="absolute right-3 top-3 z-10 flex flex-row items-center gap-2.5 sm:right-4 sm:top-4">
+            {registrationStatus ? (
+              <span
+                className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase leading-tight tracking-wide shadow-md backdrop-blur-sm sm:px-2.5 sm:py-1 sm:text-[10px] ${
+                  registrationStatus === "open"
+                    ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"
+                    : registrationStatus === "closingSoon"
+                      ? "border-amber-300/25 bg-amber-400/10 text-amber-200"
+                      : registrationStatus === "soldOut"
+                        ? "border-red-400/25 bg-red-950/20 text-red-200"
+                        : registrationStatus === "notOpenYet"
+                          ? "border-sky-300/20 bg-sky-500/10 text-sky-200"
+                          : "border-border/55 bg-secondary/40 text-muted-foreground"
+                }`}
+                title={priceNote?.trim() ? priceNote.trim() : undefined}
+              >
+                {registrationStatus === "open"
+                  ? "Open"
+                  : registrationStatus === "closingSoon"
+                    ? "Closing soon"
+                    : registrationStatus === "soldOut"
+                      ? "Sold out"
+                      : registrationStatus === "notOpenYet"
+                        ? "Not open yet"
+                        : "Cancelled"}
+              </span>
+            ) : null}
+            {!externalHref && favId ? (
+              <button
+                type="button"
+                aria-label={fav ? "Remove from favourites" : "Save to favourites"}
+                aria-pressed={fav}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  guardOrRun(
+                    () => toggle(favId),
+                    "Sign in to save favourites — they appear under Profile → Favourites.",
+                  )
+                }}
+                className={`flex size-8 shrink-0 items-center justify-center rounded-full border backdrop-blur-md transition hover:scale-110 sm:size-9 ${
+                  fav
+                    ? "border-primary/35 bg-primary/15 text-primary hover:bg-primary/20"
+                    : "border-border/55 bg-background/30 text-white/80 hover:bg-background/45 hover:text-white"
+                }`}
+              >
+                <HeartIcon filled={fav} />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!homeMinimal ? (
         <div className="absolute left-3 right-3 top-3 z-10 flex items-start justify-between gap-2 sm:left-4 sm:right-4 sm:top-4">
           <div className="flex min-w-0 max-w-[calc(100%-3.25rem)] flex-wrap content-start gap-1.5 sm:max-w-[calc(100%-4rem)] sm:gap-2">
             <span
@@ -230,7 +297,47 @@ export function RaceCard({
             ) : null}
           </div>
         </div>
+        ) : null}
 
+        {homeMinimal ? (
+          <div className="absolute bottom-0 left-0 right-0 z-10 flex flex-col gap-2.5 p-4 pb-5 pt-3 sm:gap-3 sm:p-5">
+            <div className="flex flex-wrap gap-1.5">
+              {homeMinimalDistances.map((d, i) => (
+                <span
+                  key={`${d}-${i}`}
+                  className="rounded-md border border-white/22 bg-black/40 px-2.5 py-1 text-[11px] font-semibold leading-snug text-white backdrop-blur-md"
+                >
+                  {d}
+                </span>
+              ))}
+              {homeMinimalRest > 0 ? (
+                <span
+                  className="rounded-md border border-white/18 bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white/90 backdrop-blur-md"
+                  aria-label={`${homeMinimalRest} more distances`}
+                >
+                  +{homeMinimalRest}
+                </span>
+              ) : null}
+            </div>
+            <h3 className={`${titleClass} line-clamp-2 font-black leading-tight tracking-tight text-white`}>{title}</h3>
+            <div className="flex items-center gap-2.5 text-white/90">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" className="size-4 shrink-0 text-primary" aria-hidden="true">
+                <path
+                  d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="text-sm font-semibold leading-snug">{dateLabel}</span>
+            </div>
+            {startingPriceLabel?.trim() ? (
+              <span className="inline-flex w-fit rounded-full border border-primary/45 bg-primary/18 px-3 py-1 text-xs font-bold text-primary backdrop-blur-sm sm:text-[13px]">
+                {startingPriceLabel.trim()}
+              </span>
+            ) : null}
+          </div>
+        ) : (
         <div className={`absolute bottom-0 left-0 right-0 z-10 ${compactListing ? "p-5 pb-6 pt-2" : "p-5"}`}>
           <div className={`flex items-center gap-2 ${compactListing ? "mb-3" : "mb-2"}`}>
             {flag ? <span className="text-xl leading-none">{flag}</span> : null}
@@ -305,6 +412,7 @@ export function RaceCard({
             ) : null}
           </div>
         </div>
+        )}
     </>
   )
 

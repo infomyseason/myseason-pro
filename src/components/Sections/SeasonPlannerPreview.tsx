@@ -1,6 +1,12 @@
 import { useMemo } from "react"
 import { Link } from "react-router-dom"
-import { computeDaysUntilRace, getRaceDetailById, getSubmittedRaceDetailById, type MockRaceDetail } from "../../data"
+import {
+  computeDaysUntilRace,
+  getRaceDetailById,
+  getSubmittedRaceDetailById,
+  isRaceDateNotPast,
+  type MockRaceDetail,
+} from "../../data"
 import { useUserRaceLists } from "../../hooks/useUserRaceLists"
 
 type SavedRace = {
@@ -74,6 +80,7 @@ export function SeasonPlannerPreview() {
     const rows = calendarRaceIds
       .map((id) => getRaceDetailById(id) ?? getSubmittedRaceDetailById(id))
       .filter((r): r is MockRaceDetail => Boolean(r))
+      .filter((r) => isRaceDateNotPast(r.date))
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 3)

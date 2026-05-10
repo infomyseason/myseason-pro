@@ -265,12 +265,17 @@ export function raceMatchesEventTypes(race: MockRaceDetail, selected: ExploreEve
   return selected.some((opt) => matchesEventType(race, opt))
 }
 
+/** ISO `YYYY-MM-DD`: ascending = soonest upcoming first (mixed sports share one timeline). */
+export function compareRaceDatesAscending(aIso: string, bIso: string): number {
+  return aIso.localeCompare(bIso)
+}
+
 export function filterExploreRaces(
   races: MockRaceDetail[],
   applied: AppliedExploreFilters,
   search: string,
 ): MockRaceDetail[] {
-  return races.filter(
+  const filtered = races.filter(
     (race) =>
       raceMatchesSearch(race, search) &&
       raceMatchesSports(race, applied.sports) &&
@@ -280,6 +285,7 @@ export function filterExploreRaces(
       raceMatchesCourseTypes(race, applied.courseTypes) &&
       raceMatchesEventTypes(race, applied.eventTypes),
   )
+  return filtered.slice().sort((a, b) => compareRaceDatesAscending(a.date, b.date))
 }
 
 export function formatRaceDateLabel(isoDate: string): string {

@@ -9,6 +9,7 @@ import {
   SportSections,
   WorldClassEvents,
 } from "../../components"
+import { HOME_SECTION_INNER } from "../../components/Sections/homeSectionLayout"
 import { Link } from "react-router-dom"
 
 export function HomePage() {
@@ -22,8 +23,8 @@ export function HomePage() {
       <SeasonPlannerPreview />
       <SportSections />
       <CommunityRaces />
-      <section className="border-t border-border/30 bg-secondary/10 px-4 py-9 md:py-14">
-        <div className="mx-auto flex max-w-7xl justify-center">
+      <section className="border-t border-border/30 bg-secondary/10 py-10 md:py-16">
+        <div className={`${HOME_SECTION_INNER} flex justify-center`}>
           <Link
             to="/explore"
             className="inline-flex items-center justify-center rounded-full border border-primary/35 bg-primary/12 px-8 py-3 text-sm font-semibold text-primary transition hover:border-primary/55 hover:bg-primary/[0.16]"
