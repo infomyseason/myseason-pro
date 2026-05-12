@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
 
@@ -54,9 +54,13 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
   return out
 }
 
+function readColumn(row: Record<string, unknown>, dbColumn: string, legacyColumn: string): unknown {
+  return row[dbColumn] ?? row[legacyColumn]
+}
+
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
-  const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const legacyCalendarIds = readIdArray(readColumn(row, "calendar_race_ids", "calendarRaceIds"))
+  const calendarEntries = readCalendarEntries(readColumn(row, "calendar_entries", "calendarEntries"))
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,16 +70,34 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(readColumn(row, "planned_race_ids", "plannedRaceIds")),
+    completedRaceIds: readIdArray(readColumn(row, "completed_race_ids", "completedRaceIds")),
     calendarEntries: mergedEntries,
   }
 }
 
 async function fetchSeasonRow(userId: string): Promise<UserRaceLists> {
   const { data, error } = await supabase.from("user_season_data").select("*").eq("user_id", userId).maybeSingle()
-  if (error || !data) return defaultUserRaceLists()
+  if (error) throw error
+  if (!data) return defaultUserRaceLists()
   return listsFromRow(data as Record<string, unknown>)
+}
+
+function mergeIdLists(persisted: string[], pending: string[]): string[] {
+  return [...new Set([...persisted, ...pending])]
+}
+
+function mergeCalendarEntries(persisted: CalendarEntry[], pending: CalendarEntry[]): CalendarEntry[] {
+  const pendingRaceIds = new Set(pending.map((entry) => entry.raceId))
+  return [...pending, ...persisted.filter((entry) => !pendingRaceIds.has(entry.raceId))]
+}
+
+function mergeBeforeHydratedSave(persisted: UserRaceLists, pending: UserRaceLists): UserRaceLists {
+  return {
+    plannedRaceIds: mergeIdLists(persisted.plannedRaceIds, pending.plannedRaceIds),
+    completedRaceIds: mergeIdLists(persisted.completedRaceIds, pending.completedRaceIds),
+    calendarEntries: mergeCalendarEntries(persisted.calendarEntries, pending.calendarEntries),
+  }
 }
 
 export function useUserRaceLists(): UserRaceLists & {
@@ -88,14 +110,28 @@ export function useUserRaceLists(): UserRaceLists & {
   const userId = user?.id ?? null
 
   const [lists, setListsState] = useState<UserRaceLists>(defaultUserRaceLists())
+  const hydratedUserIdRef = useRef<string | null>(null)
+  const loadVersionRef = useRef(0)
 
   const reload = useCallback(async () => {
+    const loadVersion = loadVersionRef.current + 1
+    loadVersionRef.current = loadVersion
+    hydratedUserIdRef.current = null
+
     if (!userId) {
       setListsState(defaultUserRaceLists())
       return
     }
-    const next = await fetchSeasonRow(userId)
-    setListsState(next)
+
+    setListsState(defaultUserRaceLists())
+    try {
+      const next = await fetchSeasonRow(userId)
+      if (loadVersionRef.current !== loadVersion) return
+      hydratedUserIdRef.current = userId
+      setListsState(next)
+    } catch (error) {
+      if (loadVersionRef.current === loadVersion) console.error(error)
+    }
   }, [userId])
 
   useEffect(() => {
@@ -106,11 +142,24 @@ export function useUserRaceLists(): UserRaceLists & {
   const setLists = useCallback(
     async (next: UserRaceLists) => {
       if (!userId) return
+      const needsHydration = hydratedUserIdRef.current !== userId
+      let nextToPersist = next
+
+      if (needsHydration) {
+        try {
+          const persisted = await fetchSeasonRow(userId)
+          nextToPersist = mergeBeforeHydratedSave(persisted, next)
+        } catch (error) {
+          console.error(error)
+          return
+        }
+      }
+
       const payload = {
         user_id: userId,
-        planned_race_ids: next.plannedRaceIds,
-        completed_race_ids: next.completedRaceIds,
-        calendar_entries: next.calendarEntries,
+        planned_race_ids: nextToPersist.plannedRaceIds,
+        completed_race_ids: nextToPersist.completedRaceIds,
+        calendar_entries: nextToPersist.calendarEntries,
         updated_at: new Date().toISOString(),
       }
       const { error } = await supabase.from("user_season_data").upsert(payload, { onConflict: "user_id" })
@@ -118,7 +167,10 @@ export function useUserRaceLists(): UserRaceLists & {
         console.error(error)
         return
       }
-      setListsState(next)
+
+      loadVersionRef.current += 1
+      hydratedUserIdRef.current = userId
+      setListsState(nextToPersist)
     },
     [userId],
   )
