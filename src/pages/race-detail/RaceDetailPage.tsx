@@ -52,6 +52,7 @@ export function RaceDetailPage() {
     const idx = (window.history.state as { idx?: unknown } | null)?.idx
     return typeof idx === "number" ? idx > 0 : window.history.length > 1
   }, [])
+  const distanceOptions = useMemo(() => (race ? planningDistanceOptions(race) : ["Distance TBD"]), [race])
 
   useEffect(() => {
     setRouteMapOpen(false)
@@ -118,7 +119,6 @@ export function RaceDetailPage() {
   const savedToFavourites = isFavourite(race.id)
   const existingPlan = calendarEntries.find((e) => e.raceId === race.id) ?? null
   const inCalendar = Boolean(existingPlan)
-  const distanceOptions = useMemo(() => planningDistanceOptions(race), [race])
   const registrationLabel =
     race.registrationStatus === "open"
       ? "Open for registration"
