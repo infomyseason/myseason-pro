@@ -37,15 +37,16 @@ export function RegisterPage() {
     const wantLogin = login.length >= 1
     const wantDisplay = display.length >= 1
 
-    if (!wantLogin && !wantDisplay) {
-      setTakenLogin(false)
-      setTakenDisplay(false)
-      setCheckingIdentity(false)
-      return
-    }
+    const req = ++identityReq.current
 
     const delay = setTimeout(() => {
-      const req = ++identityReq.current
+      if (!wantLogin && !wantDisplay) {
+        setTakenLogin(false)
+        setTakenDisplay(false)
+        setCheckingIdentity(false)
+        return
+      }
+
       setCheckingIdentity(true)
 
       void (async () => {
@@ -73,7 +74,7 @@ export function RegisterPage() {
         setTakenLogin(wantLogin && check?.login_available !== true)
         setTakenDisplay(wantDisplay && check?.display_available !== true)
       })()
-    }, 420)
+    }, wantLogin || wantDisplay ? 420 : 0)
 
     return () => clearTimeout(delay)
   }, [loginName, displayName])
