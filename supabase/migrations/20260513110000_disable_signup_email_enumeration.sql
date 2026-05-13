@@ -1,12 +1,7 @@
--- Globally unique display names (case-insensitive, trimmed), same rules as login_name.
--- Pre-signup checks for public identity fields. Email uniqueness is left to Supabase Auth
--- so anonymous callers cannot probe auth.users for registered email addresses.
+-- Keep anonymous signup checks limited to public identity fields.
+-- The p_email argument is retained for client compatibility but is intentionally
+-- not inspected; Supabase Auth owns email uniqueness without exposing auth.users.
 
-create unique index if not exists profiles_display_name_lower_unique
-  on public.profiles (lower(trim(display_name)))
-  where display_name is not null and trim(display_name) <> '';
-
--- One round-trip: login and public display name availability.
 create or replace function public.signup_identity_available(
   p_login text,
   p_display text,
@@ -15,7 +10,7 @@ create or replace function public.signup_identity_available(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = public
 stable
 as $$
 declare
