@@ -55,8 +55,8 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
 }
 
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
-  const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const legacyCalendarIds = readIdArray(row.calendar_race_ids ?? row.calendarRaceIds)
+  const calendarEntries = readCalendarEntries(row.calendar_entries ?? row.calendarEntries)
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,15 +66,16 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(row.planned_race_ids ?? row.plannedRaceIds),
+    completedRaceIds: readIdArray(row.completed_race_ids ?? row.completedRaceIds),
     calendarEntries: mergedEntries,
   }
 }
 
 async function fetchSeasonRow(userId: string): Promise<UserRaceLists> {
   const { data, error } = await supabase.from("user_season_data").select("*").eq("user_id", userId).maybeSingle()
-  if (error || !data) return defaultUserRaceLists()
+  if (error) throw error
+  if (!data) return defaultUserRaceLists()
   return listsFromRow(data as Record<string, unknown>)
 }
 
@@ -88,14 +89,22 @@ export function useUserRaceLists(): UserRaceLists & {
   const userId = user?.id ?? null
 
   const [lists, setListsState] = useState<UserRaceLists>(defaultUserRaceLists())
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     if (!userId) {
       setListsState(defaultUserRaceLists())
+      setLoadedUserId(null)
       return
     }
-    const next = await fetchSeasonRow(userId)
-    setListsState(next)
+    setLoadedUserId(null)
+    try {
+      const next = await fetchSeasonRow(userId)
+      setListsState(next)
+      setLoadedUserId(userId)
+    } catch (error) {
+      console.error(error)
+    }
   }, [userId])
 
   useEffect(() => {
@@ -106,6 +115,10 @@ export function useUserRaceLists(): UserRaceLists & {
   const setLists = useCallback(
     async (next: UserRaceLists) => {
       if (!userId) return
+      if (loadedUserId !== userId) {
+        console.error("Refusing to save season data before it has loaded.")
+        return
+      }
       const payload = {
         user_id: userId,
         planned_race_ids: next.plannedRaceIds,
@@ -120,7 +133,7 @@ export function useUserRaceLists(): UserRaceLists & {
       }
       setListsState(next)
     },
-    [userId],
+    [userId, loadedUserId],
   )
 
   return {
