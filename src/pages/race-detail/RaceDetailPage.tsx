@@ -71,6 +71,8 @@ export function RaceDetailPage() {
     }
   }, [routeMapOpen])
 
+  const distanceOptions = useMemo(() => (race ? planningDistanceOptions(race) : ["Distance TBD"]), [race])
+
   if (!race) {
     return (
       <div className="min-h-screen bg-background px-4 py-28 text-center">
@@ -118,7 +120,6 @@ export function RaceDetailPage() {
   const savedToFavourites = isFavourite(race.id)
   const existingPlan = calendarEntries.find((e) => e.raceId === race.id) ?? null
   const inCalendar = Boolean(existingPlan)
-  const distanceOptions = useMemo(() => planningDistanceOptions(race), [race])
   const registrationLabel =
     race.registrationStatus === "open"
       ? "Open for registration"
