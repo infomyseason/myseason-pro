@@ -10,12 +10,6 @@ const FIELD_CLASS =
 
 const FIELD_TAKEN = " border-amber-600/60 focus:border-amber-600/70"
 
-function emailReadyForAvailabilityCheck(raw: string): boolean {
-  const t = raw.trim()
-  const parts = t.split("@")
-  return parts.length === 2 && parts[0].length >= 1 && parts[1].length >= 1
-}
-
 export function RegisterPage() {
   const navigate = useNavigate()
   const { isLoggedIn, loading, signUp } = useAuth()
@@ -29,7 +23,6 @@ export function RegisterPage() {
   const [pendingConfirm, setPendingConfirm] = useState(false)
   const [takenLogin, setTakenLogin] = useState(false)
   const [takenDisplay, setTakenDisplay] = useState(false)
-  const [takenEmail, setTakenEmail] = useState(false)
   const [checkingIdentity, setCheckingIdentity] = useState(false)
   const identityReq = useRef(0)
 
@@ -40,16 +33,13 @@ export function RegisterPage() {
   useEffect(() => {
     const login = loginName.trim()
     const display = displayName.trim()
-    const mail = email.trim()
 
     const wantLogin = login.length >= 1
     const wantDisplay = display.length >= 1
-    const wantEmail = emailReadyForAvailabilityCheck(mail)
 
-    if (!wantLogin && !wantDisplay && !wantEmail) {
+    if (!wantLogin && !wantDisplay) {
       setTakenLogin(false)
       setTakenDisplay(false)
-      setTakenEmail(false)
       setCheckingIdentity(false)
       return
     }
@@ -62,7 +52,7 @@ export function RegisterPage() {
         const { data: idCheck, error: rpcErr } = await supabase.rpc("signup_identity_available", {
           p_login: login,
           p_display: display,
-          p_email: mail,
+          p_email: "",
         })
 
         if (identityReq.current !== req) return
@@ -72,27 +62,24 @@ export function RegisterPage() {
         if (rpcErr) {
           setTakenLogin(false)
           setTakenDisplay(false)
-          setTakenEmail(false)
           return
         }
 
         const check = idCheck as {
           login_available?: boolean
           display_available?: boolean
-          email_available?: boolean
         } | null
 
         setTakenLogin(wantLogin && check?.login_available !== true)
         setTakenDisplay(wantDisplay && check?.display_available !== true)
-        setTakenEmail(wantEmail && check?.email_available !== true)
       })()
     }, 420)
 
     return () => clearTimeout(delay)
-  }, [loginName, displayName, email])
+  }, [loginName, displayName])
 
   const pwdHints = validatePasswordRules(password)
-  const identityBlocked = takenLogin || takenDisplay || takenEmail
+  const identityBlocked = takenLogin || takenDisplay
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -115,7 +102,7 @@ export function RegisterPage() {
     }
 
     if (identityBlocked) {
-      setError("Choose a login name, display name, and email that are not already used.")
+      setError("Choose a login name and display name that are not already used.")
       return
     }
 
@@ -130,19 +117,18 @@ export function RegisterPage() {
     const { data: idCheck, error: rpcErr } = await supabase.rpc("signup_identity_available", {
       p_login: loginNameVal,
       p_display: displayNameVal,
-      p_email: emailVal,
+      p_email: "",
     })
 
     if (rpcErr) {
       setSubmitting(false)
-      setError(rpcErr.message || "Could not validate login name, display name, or email.")
+      setError(rpcErr.message || "Could not validate login name or display name.")
       return
     }
 
     const check = idCheck as {
       login_available?: boolean
       display_available?: boolean
-      email_available?: boolean
     } | null
 
     if (check?.login_available !== true) {
@@ -153,11 +139,6 @@ export function RegisterPage() {
     if (check?.display_available !== true) {
       setSubmitting(false)
       setError("Display name already taken.")
-      return
-    }
-    if (check?.email_available !== true) {
-      setSubmitting(false)
-      setError("Email already registered.")
       return
     }
 
@@ -177,9 +158,9 @@ export function RegisterPage() {
         msg.includes("already been registered") ||
         msg.includes("user already exists")
       ) {
-        setError("Email already registered.")
+        setError("Could not create account. If you already have an account, sign in or reset your password.")
       } else if (msg.includes("duplicate key") || msg.includes("unique constraint")) {
-        setError("That login name, display name, or email is already in use.")
+        setError("That login name or display name is already in use.")
       } else {
         setError(res.error.message)
       }
@@ -233,17 +214,9 @@ export function RegisterPage() {
             value={email}
             onChange={(e) => {
               setEmail(e.target.value)
-              setTakenEmail(false)
             }}
-            className={FIELD_CLASS + (takenEmail ? FIELD_TAKEN : "")}
+            className={FIELD_CLASS}
           />
-          {takenEmail ? (
-            <p className="mt-1.5 text-xs text-amber-200/95" role="status">
-              Already used
-            </p>
-          ) : checkingIdentity && emailReadyForAvailabilityCheck(email) ? (
-            <p className="mt-1.5 text-xs text-muted-foreground">Checking…</p>
-          ) : null}
         </label>
 
         <label className="block">

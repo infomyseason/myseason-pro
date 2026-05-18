@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { SportKey } from "../components/sportTokens"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
@@ -80,18 +80,31 @@ export function usePersistedProfile(): {
   const authDisplayName = user?.displayName ?? ""
 
   const [profile, setProfileState] = useState<LocalProfile>(GUEST_PROFILE)
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null)
+  const reloadSeq = useRef(0)
 
   const reload = useCallback(async () => {
+    const seq = ++reloadSeq.current
     if (!userId) {
       setProfileState(GUEST_PROFILE)
+      setLoadedUserId(null)
       return
     }
+    const fallbackProfile = freshProfileForAuthUser(authDisplayName)
+    setProfileState(fallbackProfile)
+    setLoadedUserId(null)
     const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
-    if (error || !data) {
-      setProfileState(freshProfileForAuthUser(authDisplayName))
+    if (reloadSeq.current !== seq) return
+    if (error) {
+      console.error(error)
+      return
+    }
+    if (!data) {
+      setLoadedUserId(userId)
       return
     }
     setProfileState(rowToLocal(data as ProfileCols, authDisplayName))
+    setLoadedUserId(userId)
   }, [userId, authDisplayName])
 
   useEffect(() => {
@@ -102,6 +115,10 @@ export function usePersistedProfile(): {
   const setProfile = useCallback(
     async (next: LocalProfile) => {
       if (!userId) return false
+      if (loadedUserId !== userId) {
+        console.error("Refusing to save profile before it has loaded.")
+        return false
+      }
       const patch = {
         display_name: next.displayName.trim(),
         avatar_url: next.avatarUrl.trim(),
@@ -110,16 +127,30 @@ export function usePersistedProfile(): {
         favourite_sport_keys: next.favouriteSportKeys,
         updated_at: new Date().toISOString(),
       }
-      const { error } = await supabase.from("profiles").update(patch).eq("id", userId)
+      const selectedColumns = "display_name, avatar_url, bio, location_line, favourite_sport_keys"
+      const { data, error } = await supabase.from("profiles").update(patch).eq("id", userId).select(selectedColumns).maybeSingle()
       if (error) {
         console.error(error)
         return false
       }
-      setProfileState(next)
+      let persisted = data as ProfileCols | null
+      if (!persisted) {
+        const { data: inserted, error: insertError } = await supabase
+          .from("profiles")
+          .insert({ id: userId, ...patch })
+          .select(selectedColumns)
+          .maybeSingle()
+        if (insertError || !inserted) {
+          console.error(insertError ?? new Error("Profile save did not return a row."))
+          return false
+        }
+        persisted = inserted as ProfileCols
+      }
+      setProfileState(rowToLocal(persisted, next.displayName))
       await refreshProfile()
       return true
     },
-    [userId, refreshProfile],
+    [userId, loadedUserId, refreshProfile],
   )
 
   return {
