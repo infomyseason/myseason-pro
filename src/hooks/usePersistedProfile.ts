@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { SportKey } from "../components/sportTokens"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
@@ -79,19 +79,29 @@ export function usePersistedProfile(): {
   const userId = user?.id ?? null
   const authDisplayName = user?.displayName ?? ""
 
-  const [profile, setProfileState] = useState<LocalProfile>(GUEST_PROFILE)
+  const currentUserIdRef = useRef<string | null>(userId)
+  const [profileSnapshot, setProfileSnapshot] = useState<{ userId: string | null; profile: LocalProfile }>({
+    userId: null,
+    profile: GUEST_PROFILE,
+  })
+
+  useEffect(() => {
+    currentUserIdRef.current = userId
+  }, [userId])
 
   const reload = useCallback(async () => {
-    if (!userId) {
-      setProfileState(GUEST_PROFILE)
+    const requestedUserId = userId
+    if (!requestedUserId) {
+      setProfileSnapshot({ userId: null, profile: GUEST_PROFILE })
       return
     }
-    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", requestedUserId).maybeSingle()
+    if (currentUserIdRef.current !== requestedUserId) return
     if (error || !data) {
-      setProfileState(freshProfileForAuthUser(authDisplayName))
+      setProfileSnapshot({ userId: requestedUserId, profile: freshProfileForAuthUser(authDisplayName) })
       return
     }
-    setProfileState(rowToLocal(data as ProfileCols, authDisplayName))
+    setProfileSnapshot({ userId: requestedUserId, profile: rowToLocal(data as ProfileCols, authDisplayName) })
   }, [userId, authDisplayName])
 
   useEffect(() => {
@@ -101,7 +111,8 @@ export function usePersistedProfile(): {
 
   const setProfile = useCallback(
     async (next: LocalProfile) => {
-      if (!userId) return false
+      const writeUserId = userId
+      if (!writeUserId) return false
       const patch = {
         display_name: next.displayName.trim(),
         avatar_url: next.avatarUrl.trim(),
@@ -110,20 +121,29 @@ export function usePersistedProfile(): {
         favourite_sport_keys: next.favouriteSportKeys,
         updated_at: new Date().toISOString(),
       }
-      const { error } = await supabase.from("profiles").update(patch).eq("id", userId)
+      const { error } = await supabase.from("profiles").update(patch).eq("id", writeUserId)
       if (error) {
         console.error(error)
         return false
       }
-      setProfileState(next)
-      await refreshProfile()
+      if (currentUserIdRef.current === writeUserId) {
+        setProfileSnapshot({ userId: writeUserId, profile: next })
+        await refreshProfile()
+      }
       return true
     },
     [userId, refreshProfile],
   )
 
+  const profile =
+    userId && profileSnapshot.userId === userId
+      ? profileSnapshot.profile
+      : userId
+        ? freshProfileForAuthUser(authDisplayName)
+        : GUEST_PROFILE
+
   return {
-    profile: userId ? profile : GUEST_PROFILE,
+    profile,
     setProfile,
   }
 }
