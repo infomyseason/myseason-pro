@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
 
@@ -10,20 +10,33 @@ export function useFavouriteRaceIds(): {
   const { user } = useAuth()
   const userId = user?.id ?? null
 
-  const [ids, setIds] = useState<Set<string>>(new Set())
+  const currentUserIdRef = useRef<string | null>(userId)
+  const [idsSnapshot, setIdsSnapshot] = useState<{ userId: string | null; ids: Set<string> }>({
+    userId: null,
+    ids: new Set(),
+  })
+
+  useEffect(() => {
+    currentUserIdRef.current = userId
+  }, [userId])
 
   const reload = useCallback(async () => {
-    if (!userId) {
-      setIds(new Set())
+    const requestedUserId = userId
+    if (!requestedUserId) {
+      setIdsSnapshot({ userId: null, ids: new Set() })
       return
     }
-    const { data, error } = await supabase.from("user_favourite_races").select("race_id").eq("user_id", userId)
+    const { data, error } = await supabase.from("user_favourite_races").select("race_id").eq("user_id", requestedUserId)
+    if (currentUserIdRef.current !== requestedUserId) return
     if (error || !data) {
       console.error(error)
-      setIds(new Set())
+      setIdsSnapshot({ userId: requestedUserId, ids: new Set() })
       return
     }
-    setIds(new Set(data.map((r) => r.race_id).filter((x): x is string => typeof x === "string")))
+    setIdsSnapshot({
+      userId: requestedUserId,
+      ids: new Set(data.map((r) => r.race_id).filter((x): x is string => typeof x === "string")),
+    })
   }, [userId])
 
   useEffect(() => {
@@ -31,28 +44,37 @@ export function useFavouriteRaceIds(): {
     void reload()
   }, [reload])
 
+  const ids = idsSnapshot.userId === userId ? idsSnapshot.ids : new Set<string>()
+
   const toggle = useCallback(
     async (raceId: string) => {
-      if (!userId) return
+      const writeUserId = userId
+      if (!writeUserId) return
       const had = ids.has(raceId)
       if (had) {
-        const { error } = await supabase.from("user_favourite_races").delete().eq("user_id", userId).eq("race_id", raceId)
+        const { error } = await supabase.from("user_favourite_races").delete().eq("user_id", writeUserId).eq("race_id", raceId)
         if (error) {
           console.error(error)
           return
         }
-        setIds((prev) => {
-          const next = new Set(prev)
+        if (currentUserIdRef.current !== writeUserId) return
+        setIdsSnapshot((prev) => {
+          const next = new Set(prev.userId === writeUserId ? prev.ids : ids)
           next.delete(raceId)
-          return next
+          return { userId: writeUserId, ids: next }
         })
       } else {
-        const { error } = await supabase.from("user_favourite_races").insert({ user_id: userId, race_id: raceId })
+        const { error } = await supabase.from("user_favourite_races").insert({ user_id: writeUserId, race_id: raceId })
         if (error) {
           console.error(error)
           return
         }
-        setIds((prev) => new Set(prev).add(raceId))
+        if (currentUserIdRef.current !== writeUserId) return
+        setIdsSnapshot((prev) => {
+          const next = new Set(prev.userId === writeUserId ? prev.ids : ids)
+          next.add(raceId)
+          return { userId: writeUserId, ids: next }
+        })
       }
     },
     [userId, ids],

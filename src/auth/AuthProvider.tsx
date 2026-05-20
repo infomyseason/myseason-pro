@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { Session } from "@supabase/supabase-js"
 import type { AppUser, AuthContextValue, ProfileRow } from "./context"
 import { AuthContext } from "./context"
@@ -7,13 +7,14 @@ import { supabase } from "../lib/supabase"
 function buildAppUser(session: Session | null, profile: ProfileRow | null): AppUser | null {
   if (!session?.user) return null
   const u = session.user
+  const safeProfile = profile?.id === u.id ? profile : null
   const email = u.email ?? ""
   const meta = (u.user_metadata ?? {}) as Record<string, unknown>
   const metaLogin = typeof meta.login_name === "string" ? meta.login_name.trim() : null
   const metaDisplay = typeof meta.display_name === "string" ? meta.display_name.trim() : ""
   const displayName =
-    (profile?.display_name?.trim() || metaDisplay || email.split("@")[0] || "Athlete").trim() || "Athlete"
-  const loginNameRaw = profile?.login_name?.trim() || metaLogin
+    (safeProfile?.display_name?.trim() || metaDisplay || email.split("@")[0] || "Athlete").trim() || "Athlete"
+  const loginNameRaw = safeProfile?.login_name?.trim() || metaLogin
   return {
     id: u.id,
     email,
@@ -32,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profileRow, setProfileRow] = useState<ProfileRow | null>(null)
   const [loading, setLoading] = useState(true)
+  const hydrateRequestRef = useRef(0)
 
   const refreshProfile = useCallback(async () => {
     const { data: ures } = await supabase.auth.getUser()
@@ -48,15 +50,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true
 
     const hydrate = async (sess: Session | null) => {
+      const requestId = ++hydrateRequestRef.current
       if (!alive) return
       setSession(sess ?? null)
+      setProfileRow(null)
       if (sess?.user?.id) {
-        const p = await fetchProfile(sess.user.id)
-        if (!alive) return
-        setProfileRow(p)
-      } else {
-        setProfileRow(null)
+        const userId = sess.user.id
+        const p = await fetchProfile(userId)
+        if (!alive || hydrateRequestRef.current !== requestId) return
+        setProfileRow(p?.id === userId ? p : null)
       }
+      if (!alive || hydrateRequestRef.current !== requestId) return
       setLoading(false)
     }
 

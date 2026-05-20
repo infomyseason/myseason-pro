@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
 
@@ -55,8 +55,8 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
 }
 
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
-  const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const legacyCalendarIds = readIdArray(row.calendar_race_ids ?? row.calendarRaceIds)
+  const calendarEntries = readCalendarEntries(row.calendar_entries ?? row.calendarEntries)
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,8 +66,8 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(row.planned_race_ids ?? row.plannedRaceIds),
+    completedRaceIds: readIdArray(row.completed_race_ids ?? row.completedRaceIds),
     calendarEntries: mergedEntries,
   }
 }
@@ -87,15 +87,25 @@ export function useUserRaceLists(): UserRaceLists & {
   const { user } = useAuth()
   const userId = user?.id ?? null
 
-  const [lists, setListsState] = useState<UserRaceLists>(defaultUserRaceLists())
+  const currentUserIdRef = useRef<string | null>(userId)
+  const [listsSnapshot, setListsSnapshot] = useState<{ userId: string | null; lists: UserRaceLists }>({
+    userId: null,
+    lists: defaultUserRaceLists(),
+  })
+
+  useEffect(() => {
+    currentUserIdRef.current = userId
+  }, [userId])
 
   const reload = useCallback(async () => {
-    if (!userId) {
-      setListsState(defaultUserRaceLists())
+    const requestedUserId = userId
+    if (!requestedUserId) {
+      setListsSnapshot({ userId: null, lists: defaultUserRaceLists() })
       return
     }
-    const next = await fetchSeasonRow(userId)
-    setListsState(next)
+    const next = await fetchSeasonRow(requestedUserId)
+    if (currentUserIdRef.current !== requestedUserId) return
+    setListsSnapshot({ userId: requestedUserId, lists: next })
   }, [userId])
 
   useEffect(() => {
@@ -105,9 +115,10 @@ export function useUserRaceLists(): UserRaceLists & {
 
   const setLists = useCallback(
     async (next: UserRaceLists) => {
-      if (!userId) return
+      const writeUserId = userId
+      if (!writeUserId) return
       const payload = {
-        user_id: userId,
+        user_id: writeUserId,
         planned_race_ids: next.plannedRaceIds,
         completed_race_ids: next.completedRaceIds,
         calendar_entries: next.calendarEntries,
@@ -118,10 +129,13 @@ export function useUserRaceLists(): UserRaceLists & {
         console.error(error)
         return
       }
-      setListsState(next)
+      if (currentUserIdRef.current !== writeUserId) return
+      setListsSnapshot({ userId: writeUserId, lists: next })
     },
     [userId],
   )
+
+  const lists = listsSnapshot.userId === userId ? listsSnapshot.lists : defaultUserRaceLists()
 
   return {
     ...lists,
