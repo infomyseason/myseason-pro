@@ -80,18 +80,29 @@ export function usePersistedProfile(): {
   const authDisplayName = user?.displayName ?? ""
 
   const [profile, setProfileState] = useState<LocalProfile>(GUEST_PROFILE)
+  const [profileLoaded, setProfileLoaded] = useState(false)
 
   const reload = useCallback(async () => {
     if (!userId) {
       setProfileState(GUEST_PROFILE)
+      setProfileLoaded(false)
       return
     }
+    setProfileLoaded(false)
+    setProfileState(freshProfileForAuthUser(authDisplayName))
     const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
-    if (error || !data) {
+    if (error) {
+      console.error(error)
+      setProfileLoaded(false)
+      return
+    }
+    if (!data) {
       setProfileState(freshProfileForAuthUser(authDisplayName))
+      setProfileLoaded(true)
       return
     }
     setProfileState(rowToLocal(data as ProfileCols, authDisplayName))
+    setProfileLoaded(true)
   }, [userId, authDisplayName])
 
   useEffect(() => {
@@ -101,8 +112,9 @@ export function usePersistedProfile(): {
 
   const setProfile = useCallback(
     async (next: LocalProfile) => {
-      if (!userId) return false
+      if (!userId || !profileLoaded) return false
       const patch = {
+        id: userId,
         display_name: next.displayName.trim(),
         avatar_url: next.avatarUrl.trim(),
         bio: next.bio,
@@ -110,7 +122,7 @@ export function usePersistedProfile(): {
         favourite_sport_keys: next.favouriteSportKeys,
         updated_at: new Date().toISOString(),
       }
-      const { error } = await supabase.from("profiles").update(patch).eq("id", userId)
+      const { error } = await supabase.from("profiles").upsert(patch, { onConflict: "id" })
       if (error) {
         console.error(error)
         return false
@@ -119,7 +131,7 @@ export function usePersistedProfile(): {
       await refreshProfile()
       return true
     },
-    [userId, refreshProfile],
+    [userId, profileLoaded, refreshProfile],
   )
 
   return {
