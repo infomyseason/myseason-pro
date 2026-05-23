@@ -56,7 +56,7 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
 
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
   const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const calendarEntries = readCalendarEntries(row.calendar_entries ?? row.calendarEntries)
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,8 +66,8 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(row.planned_race_ids ?? row.plannedRaceIds),
+    completedRaceIds: readIdArray(row.completed_race_ids ?? row.completedRaceIds),
     calendarEntries: mergedEntries,
   }
 }
