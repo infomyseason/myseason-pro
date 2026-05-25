@@ -42,7 +42,8 @@ export function RaceDetailPage() {
   const navigate = useNavigate()
   const { raceId } = useParams<{ raceId: string }>()
   const race = raceId ? getRaceDetailById(raceId) ?? getSubmittedRaceDetailById(raceId) : undefined
-  const [routeMapOpen, setRouteMapOpen] = useState(false)
+  const [routeMapOpenRaceId, setRouteMapOpenRaceId] = useState<string | null>(null)
+  const routeMapOpen = routeMapOpenRaceId === race?.id
   const { toggle, isFavourite } = useFavouriteRaceIds()
   const { calendarEntries, setLists, plannedRaceIds, completedRaceIds } = useUserRaceLists()
   const { guardOrRun, isLoggedIn } = useRequireLoginAction()
@@ -54,13 +55,9 @@ export function RaceDetailPage() {
   }, [])
 
   useEffect(() => {
-    setRouteMapOpen(false)
-  }, [raceId])
-
-  useEffect(() => {
     if (!routeMapOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setRouteMapOpen(false)
+      if (e.key === "Escape") setRouteMapOpenRaceId(null)
     }
     document.addEventListener("keydown", onKey)
     const prevOverflow = document.body.style.overflow
@@ -70,6 +67,8 @@ export function RaceDetailPage() {
       document.body.style.overflow = prevOverflow
     }
   }, [routeMapOpen])
+
+  const distanceOptions = useMemo(() => (race ? planningDistanceOptions(race) : []), [race])
 
   if (!race) {
     return (
@@ -118,7 +117,6 @@ export function RaceDetailPage() {
   const savedToFavourites = isFavourite(race.id)
   const existingPlan = calendarEntries.find((e) => e.raceId === race.id) ?? null
   const inCalendar = Boolean(existingPlan)
-  const distanceOptions = useMemo(() => planningDistanceOptions(race), [race])
   const registrationLabel =
     race.registrationStatus === "open"
       ? "Open for registration"
@@ -460,7 +458,7 @@ export function RaceDetailPage() {
                     {routePreviewInteractive ? (
                       <button
                         type="button"
-                        onClick={() => setRouteMapOpen(true)}
+                        onClick={() => setRouteMapOpenRaceId(race.id)}
                         className="group relative h-28 w-full overflow-hidden rounded-lg border border-border text-left shadow-sm ring-1 ring-black/[0.03] transition-transform duration-300 hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/[0.08] dark:shadow-none dark:ring-white/[0.04] sm:h-[5.5rem] sm:w-[7.25rem]"
                         aria-label="View course map"
                       >
@@ -627,7 +625,7 @@ export function RaceDetailPage() {
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/82 p-4 backdrop-blur-sm"
           role="presentation"
-          onClick={() => setRouteMapOpen(false)}
+          onClick={() => setRouteMapOpenRaceId(null)}
         >
           <div
             role="dialog"
@@ -639,7 +637,7 @@ export function RaceDetailPage() {
             <button
               type="button"
               className="absolute right-3 top-3 z-10 flex size-9 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-md backdrop-blur-md transition hover:bg-muted dark:border-white/15 dark:bg-black/65 dark:text-white dark:hover:bg-black/85"
-              onClick={() => setRouteMapOpen(false)}
+              onClick={() => setRouteMapOpenRaceId(null)}
               aria-label="Close course map"
             >
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
