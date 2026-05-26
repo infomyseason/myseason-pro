@@ -54,9 +54,13 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
   return out
 }
 
+function readRowValue(row: Record<string, unknown>, dbKey: string, legacyKey: string): unknown {
+  return row[dbKey] ?? row[legacyKey]
+}
+
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
-  const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const legacyCalendarIds = readIdArray(readRowValue(row, "calendar_race_ids", "calendarRaceIds"))
+  const calendarEntries = readCalendarEntries(readRowValue(row, "calendar_entries", "calendarEntries"))
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,8 +70,8 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(readRowValue(row, "planned_race_ids", "plannedRaceIds")),
+    completedRaceIds: readIdArray(readRowValue(row, "completed_race_ids", "completedRaceIds")),
     calendarEntries: mergedEntries,
   }
 }
