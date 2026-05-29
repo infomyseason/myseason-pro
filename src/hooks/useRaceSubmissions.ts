@@ -264,10 +264,11 @@ export function useRaceSubmissions(): {
       if (!canEdit(current)) return { ok: false as const, error: "You don't have permission to edit this submission." }
 
       const isAdminActor = isAdminEmail(user.email)
+      const requestedType = patch.type ?? current.type
       let nextStatus = current.status
 
-      // Approval rule: creator editing an approved official race -> back to pending.
-      if (!isAdminActor && current.type === "official_race" && current.status === "approved") {
+      // Official races always require admin approval after creator edits, including type changes from community rows.
+      if (!isAdminActor && requestedType === "official_race") {
         nextStatus = "pending"
       }
 
@@ -281,7 +282,7 @@ export function useRaceSubmissions(): {
       const merged: RaceSubmission = {
         ...current,
         ...patch,
-        status: patch.status ?? nextStatus,
+        status: isAdminActor && patch.status ? patch.status : nextStatus,
         updatedAt: nowIso(),
         updatedByUserId: user.id,
         editHistory: [...(current.editHistory ?? []), historyEntry],

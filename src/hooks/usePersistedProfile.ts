@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { SportKey } from "../components/sportTokens"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
@@ -43,11 +43,18 @@ function normalizeSports(raw: unknown): SportKey[] {
 }
 
 type ProfileCols = {
+  id?: string
   display_name: string | null
   avatar_url: string | null
   bio: string | null
   location_line: string | null
   favourite_sport_keys: string[] | null
+}
+
+type ProfileState = {
+  userId: string | null
+  profile: LocalProfile
+  loaded: boolean
 }
 
 function rowToLocal(profileRow: ProfileCols, fallbackDisplayName: string): LocalProfile {
@@ -79,29 +86,57 @@ export function usePersistedProfile(): {
   const userId = user?.id ?? null
   const authDisplayName = user?.displayName ?? ""
 
-  const [profile, setProfileState] = useState<LocalProfile>(GUEST_PROFILE)
-
-  const reload = useCallback(async () => {
-    if (!userId) {
-      setProfileState(GUEST_PROFILE)
-      return
-    }
-    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
-    if (error || !data) {
-      setProfileState(freshProfileForAuthUser(authDisplayName))
-      return
-    }
-    setProfileState(rowToLocal(data as ProfileCols, authDisplayName))
-  }, [userId, authDisplayName])
+  const [profileState, setProfileState] = useState<ProfileState>({
+    userId: null,
+    profile: GUEST_PROFILE,
+    loaded: false,
+  })
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch profile when Supabase user id changes
-    void reload()
-  }, [reload])
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear prior user's profile before loading current user's row
+    setProfileState({ userId: null, profile: GUEST_PROFILE, loaded: !userId })
+    if (!userId) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const load = async () => {
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
+      if (cancelled) return
+      if (error) {
+        console.error(error)
+        setProfileState({ userId: null, profile: GUEST_PROFILE, loaded: false })
+        return
+      }
+      const profile =
+        data && (data as ProfileCols).id === userId
+          ? rowToLocal(data as ProfileCols, authDisplayName)
+          : freshProfileForAuthUser(authDisplayName)
+      setProfileState({ userId, profile, loaded: true })
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId, authDisplayName])
+
+  const profile = useMemo(() => {
+    if (!userId) return GUEST_PROFILE
+    if (profileState.loaded && profileState.userId === userId) return profileState.profile
+    return freshProfileForAuthUser(authDisplayName)
+  }, [authDisplayName, profileState.loaded, profileState.profile, profileState.userId, userId])
 
   const setProfile = useCallback(
     async (next: LocalProfile) => {
       if (!userId) return false
+      if (!profileState.loaded || profileState.userId !== userId) {
+        console.error("Cannot save profile before the current user's profile has loaded.")
+        return false
+      }
       const patch = {
         display_name: next.displayName.trim(),
         avatar_url: next.avatarUrl.trim(),
@@ -115,15 +150,15 @@ export function usePersistedProfile(): {
         console.error(error)
         return false
       }
-      setProfileState(next)
+      setProfileState({ userId, profile: next, loaded: true })
       await refreshProfile()
       return true
     },
-    [userId, refreshProfile],
+    [profileState.loaded, profileState.userId, userId, refreshProfile],
   )
 
   return {
-    profile: userId ? profile : GUEST_PROFILE,
+    profile,
     setProfile,
   }
 }

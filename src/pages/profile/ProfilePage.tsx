@@ -93,6 +93,17 @@ export function ProfilePage() {
   }, [draft, setProfile, user?.displayName])
 
   useEffect(() => {
+    setEditing(false)
+    setDraft({
+      displayName: "",
+      avatarUrl: "",
+      bio: "",
+      locationLine: "",
+      favouriteSportKeys: [],
+    })
+  }, [user?.id])
+
+  useEffect(() => {
     if (!editing) return
     const prev = document.body.style.overflow
     document.body.style.overflow = "hidden"

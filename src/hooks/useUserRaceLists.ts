@@ -55,8 +55,8 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
 }
 
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
-  const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const legacyCalendarIds = readIdArray(row.calendar_race_ids ?? row.calendarRaceIds)
+  const calendarEntries = readCalendarEntries(row.calendar_entries ?? row.calendarEntries)
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,16 +66,28 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(row.planned_race_ids ?? row.plannedRaceIds),
+    completedRaceIds: readIdArray(row.completed_race_ids ?? row.completedRaceIds),
     calendarEntries: mergedEntries,
   }
 }
 
-async function fetchSeasonRow(userId: string): Promise<UserRaceLists> {
+type SeasonFetchResult = { ok: true; lists: UserRaceLists } | { ok: false }
+
+async function fetchSeasonRow(userId: string): Promise<SeasonFetchResult> {
   const { data, error } = await supabase.from("user_season_data").select("*").eq("user_id", userId).maybeSingle()
-  if (error || !data) return defaultUserRaceLists()
-  return listsFromRow(data as Record<string, unknown>)
+  if (error) {
+    console.error(error)
+    return { ok: false }
+  }
+  if (!data) return { ok: true, lists: defaultUserRaceLists() }
+  return { ok: true, lists: listsFromRow(data as Record<string, unknown>) }
+}
+
+type ListsState = {
+  userId: string | null
+  lists: UserRaceLists
+  loaded: boolean
 }
 
 export function useUserRaceLists(): UserRaceLists & {
@@ -87,25 +99,43 @@ export function useUserRaceLists(): UserRaceLists & {
   const { user } = useAuth()
   const userId = user?.id ?? null
 
-  const [lists, setListsState] = useState<UserRaceLists>(defaultUserRaceLists())
-
-  const reload = useCallback(async () => {
-    if (!userId) {
-      setListsState(defaultUserRaceLists())
-      return
-    }
-    const next = await fetchSeasonRow(userId)
-    setListsState(next)
-  }, [userId])
+  const [listsState, setListsState] = useState<ListsState>({
+    userId: null,
+    lists: defaultUserRaceLists(),
+    loaded: false,
+  })
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch calendar lists when Supabase user id changes
-    void reload()
-  }, [reload])
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear prior user's lists before loading current user's row
+    setListsState({ userId: null, lists: defaultUserRaceLists(), loaded: !userId })
+    if (!userId) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    void fetchSeasonRow(userId).then((result) => {
+      if (cancelled) return
+      if (result.ok) {
+        setListsState({ userId, lists: result.lists, loaded: true })
+      } else {
+        setListsState({ userId: null, lists: defaultUserRaceLists(), loaded: false })
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const setLists = useCallback(
     async (next: UserRaceLists) => {
       if (!userId) return
+      if (!listsState.loaded || listsState.userId !== userId) {
+        console.error("Cannot save season data before the current user's lists have loaded.")
+        return
+      }
       const payload = {
         user_id: userId,
         planned_race_ids: next.plannedRaceIds,
@@ -118,10 +148,12 @@ export function useUserRaceLists(): UserRaceLists & {
         console.error(error)
         return
       }
-      setListsState(next)
+      setListsState({ userId, lists: next, loaded: true })
     },
-    [userId],
+    [listsState.loaded, listsState.userId, userId],
   )
+
+  const lists = listsState.userId === userId ? listsState.lists : defaultUserRaceLists()
 
   return {
     ...lists,

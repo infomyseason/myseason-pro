@@ -7,13 +7,14 @@ import { supabase } from "../lib/supabase"
 function buildAppUser(session: Session | null, profile: ProfileRow | null): AppUser | null {
   if (!session?.user) return null
   const u = session.user
+  const sessionProfile = profile?.id === u.id ? profile : null
   const email = u.email ?? ""
   const meta = (u.user_metadata ?? {}) as Record<string, unknown>
   const metaLogin = typeof meta.login_name === "string" ? meta.login_name.trim() : null
   const metaDisplay = typeof meta.display_name === "string" ? meta.display_name.trim() : ""
   const displayName =
-    (profile?.display_name?.trim() || metaDisplay || email.split("@")[0] || "Athlete").trim() || "Athlete"
-  const loginNameRaw = profile?.login_name?.trim() || metaLogin
+    (sessionProfile?.display_name?.trim() || metaDisplay || email.split("@")[0] || "Athlete").trim() || "Athlete"
+  const loginNameRaw = sessionProfile?.login_name?.trim() || metaLogin
   return {
     id: u.id,
     email,
@@ -41,22 +42,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     const p = await fetchProfile(uid)
-    setProfileRow(p)
+    setProfileRow(p?.id === uid ? p : null)
   }, [])
 
   useEffect(() => {
     let alive = true
+    let hydrateSeq = 0
 
     const hydrate = async (sess: Session | null) => {
+      const seq = ++hydrateSeq
       if (!alive) return
+      setLoading(true)
       setSession(sess ?? null)
+      setProfileRow(null)
+      let nextProfile: ProfileRow | null = null
       if (sess?.user?.id) {
-        const p = await fetchProfile(sess.user.id)
-        if (!alive) return
-        setProfileRow(p)
-      } else {
-        setProfileRow(null)
+        nextProfile = await fetchProfile(sess.user.id)
       }
+      if (!alive || seq !== hydrateSeq) return
+      setProfileRow(nextProfile?.id === sess?.user?.id ? nextProfile : null)
       setLoading(false)
     }
 
