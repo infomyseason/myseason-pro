@@ -50,6 +50,7 @@ export function ProfilePage() {
   const { submissions } = useRaceSubmissions()
   const [activeTab, setActiveTab] = useState<ProfileTabId>("favourites")
   const [editing, setEditing] = useState(false)
+  const [draftUserId, setDraftUserId] = useState<string | null>(null)
   const [draft, setDraft] = useState<LocalProfile>(() => ({
     displayName: "",
     avatarUrl: "",
@@ -68,18 +69,21 @@ export function ProfilePage() {
   const mySubmissions = useMemo(() => submissions.filter((s) => s.createdByUserId === (user?.id ?? "")), [submissions, user?.id])
 
   const openEdit = useCallback(() => {
+    setDraftUserId(user?.id ?? null)
     setDraft({
       ...profile,
       favouriteSportKeys: [...profile.favouriteSportKeys],
     })
     setEditing(true)
-  }, [profile])
+  }, [profile, user?.id])
 
   const cancelEdit = useCallback(() => {
     setEditing(false)
+    setDraftUserId(null)
   }, [])
 
   const saveEdit = useCallback(async () => {
+    if (draftUserId !== (user?.id ?? null)) return
     const displayName = draft.displayName.trim() || user?.displayName?.trim() || ""
     const locationLine = draft.locationLine.trim()
     const ok = await setProfile({
@@ -89,8 +93,11 @@ export function ProfilePage() {
       bio: draft.bio,
       favouriteSportKeys: [...draft.favouriteSportKeys],
     })
-    if (ok) setEditing(false)
-  }, [draft, setProfile, user?.displayName])
+    if (ok) {
+      setEditing(false)
+      setDraftUserId(null)
+    }
+  }, [draft, draftUserId, setProfile, user?.displayName, user?.id])
 
   useEffect(() => {
     if (!editing) return
@@ -525,7 +532,7 @@ export function ProfilePage() {
 
       <Footer />
 
-      {editing ? (
+      {editing && draftUserId === (user?.id ?? null) ? (
         <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6">
           <button
             type="button"
