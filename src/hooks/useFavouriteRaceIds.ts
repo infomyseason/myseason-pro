@@ -12,24 +12,37 @@ export function useFavouriteRaceIds(): {
 
   const [ids, setIds] = useState<Set<string>>(new Set())
 
-  const reload = useCallback(async () => {
-    if (!userId) {
-      setIds(new Set())
-      return
-    }
-    const { data, error } = await supabase.from("user_favourite_races").select("race_id").eq("user_id", userId)
-    if (error || !data) {
-      console.error(error)
-      setIds(new Set())
-      return
-    }
-    setIds(new Set(data.map((r) => r.race_id).filter((x): x is string => typeof x === "string")))
-  }, [userId])
-
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch favourites when Supabase user id changes
-    void reload()
-  }, [reload])
+    let cancelled = false
+
+    if (!userId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear user-scoped favourites on sign-out
+      setIds(new Set())
+      return () => {
+        cancelled = true
+      }
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prevent previous account's favourites from leaking during reload
+    setIds(new Set())
+    void supabase
+      .from("user_favourite_races")
+      .select("race_id")
+      .eq("user_id", userId)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error || !data) {
+          console.error(error)
+          setIds(new Set())
+          return
+        }
+        setIds(new Set(data.map((r) => r.race_id).filter((x): x is string => typeof x === "string")))
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const toggle = useCallback(
     async (raceId: string) => {

@@ -81,23 +81,38 @@ export function usePersistedProfile(): {
 
   const [profile, setProfileState] = useState<LocalProfile>(GUEST_PROFILE)
 
-  const reload = useCallback(async () => {
-    if (!userId) {
-      setProfileState(GUEST_PROFILE)
-      return
-    }
-    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
-    if (error || !data) {
-      setProfileState(freshProfileForAuthUser(authDisplayName))
-      return
-    }
-    setProfileState(rowToLocal(data as ProfileCols, authDisplayName))
-  }, [userId, authDisplayName])
-
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch profile when Supabase user id changes
-    void reload()
-  }, [reload])
+    let cancelled = false
+
+    if (!userId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear user-scoped profile on sign-out
+      setProfileState(GUEST_PROFILE)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const fallbackProfile = freshProfileForAuthUser(authDisplayName)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prevent previous account's profile from leaking during reload
+    setProfileState(fallbackProfile)
+    void supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error || !data) {
+          setProfileState(fallbackProfile)
+          return
+        }
+        setProfileState(rowToLocal(data as ProfileCols, authDisplayName))
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId, authDisplayName])
 
   const setProfile = useCallback(
     async (next: LocalProfile) => {
