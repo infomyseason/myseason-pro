@@ -1,6 +1,27 @@
 -- Globally unique display names (case-insensitive, trimmed), same rules as login_name.
 -- Pre-signup checks + auth.users email check for clearer errors before signUp.
 
+-- Existing profiles can predate this uniqueness rule. Keep the earliest row for
+-- each normalized display name and suffix later duplicates before creating the
+-- index, otherwise the migration aborts on production data.
+with ranked_profiles as (
+  select
+    id,
+    row_number() over (
+      partition by lower(trim(display_name))
+      order by updated_at nulls last, id
+    ) as display_name_rank
+  from public.profiles
+  where display_name is not null and trim(display_name) <> ''
+)
+update public.profiles p
+set
+  display_name = concat(trim(p.display_name), ' ', p.id::text),
+  updated_at = now()
+from ranked_profiles r
+where p.id = r.id
+  and r.display_name_rank > 1;
+
 create unique index if not exists profiles_display_name_lower_unique
   on public.profiles (lower(trim(display_name)))
   where display_name is not null and trim(display_name) <> '';

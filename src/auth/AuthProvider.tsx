@@ -7,13 +7,14 @@ import { supabase } from "../lib/supabase"
 function buildAppUser(session: Session | null, profile: ProfileRow | null): AppUser | null {
   if (!session?.user) return null
   const u = session.user
+  const matchingProfile = profile?.id === u.id ? profile : null
   const email = u.email ?? ""
   const meta = (u.user_metadata ?? {}) as Record<string, unknown>
   const metaLogin = typeof meta.login_name === "string" ? meta.login_name.trim() : null
   const metaDisplay = typeof meta.display_name === "string" ? meta.display_name.trim() : ""
   const displayName =
-    (profile?.display_name?.trim() || metaDisplay || email.split("@")[0] || "Athlete").trim() || "Athlete"
-  const loginNameRaw = profile?.login_name?.trim() || metaLogin
+    (matchingProfile?.display_name?.trim() || metaDisplay || email.split("@")[0] || "Athlete").trim() || "Athlete"
+  const loginNameRaw = matchingProfile?.login_name?.trim() || metaLogin
   return {
     id: u.id,
     email,
@@ -46,13 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true
+    let hydrateSeq = 0
 
     const hydrate = async (sess: Session | null) => {
+      const seq = (hydrateSeq += 1)
       if (!alive) return
       setSession(sess ?? null)
+      setProfileRow((current) => (sess?.user?.id && current?.id === sess.user.id ? current : null))
       if (sess?.user?.id) {
         const p = await fetchProfile(sess.user.id)
-        if (!alive) return
+        if (!alive || seq !== hydrateSeq) return
         setProfileRow(p)
       } else {
         setProfileRow(null)

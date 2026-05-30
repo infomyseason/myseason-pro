@@ -55,8 +55,8 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
 }
 
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
-  const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const legacyCalendarIds = readIdArray(row.calendar_race_ids ?? row.calendarRaceIds)
+  const calendarEntries = readCalendarEntries(row.calendar_entries ?? row.calendarEntries)
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,8 +66,8 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(row.planned_race_ids ?? row.plannedRaceIds),
+    completedRaceIds: readIdArray(row.completed_race_ids ?? row.completedRaceIds),
     calendarEntries: mergedEntries,
   }
 }
@@ -89,19 +89,26 @@ export function useUserRaceLists(): UserRaceLists & {
 
   const [lists, setListsState] = useState<UserRaceLists>(defaultUserRaceLists())
 
-  const reload = useCallback(async () => {
-    if (!userId) {
-      setListsState(defaultUserRaceLists())
-      return
-    }
-    const next = await fetchSeasonRow(userId)
-    setListsState(next)
-  }, [userId])
-
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch calendar lists when Supabase user id changes
-    void reload()
-  }, [reload])
+    let cancelled = false
+
+    if (!userId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear user-scoped season data on sign-out
+      setListsState(defaultUserRaceLists())
+      return () => {
+        cancelled = true
+      }
+    }
+
+    setListsState(defaultUserRaceLists())
+    void fetchSeasonRow(userId).then((next) => {
+      if (!cancelled) setListsState(next)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const setLists = useCallback(
     async (next: UserRaceLists) => {
