@@ -54,6 +54,7 @@ export function RaceDetailPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close any open route overlay when navigating to a different race
     setRouteMapOpen(false)
   }, [raceId])
 

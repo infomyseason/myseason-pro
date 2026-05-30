@@ -23,7 +23,6 @@ export function useFavouriteRaceIds(): {
       }
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- prevent previous account's favourites from leaking during reload
     setIds(new Set())
     void supabase
       .from("user_favourite_races")

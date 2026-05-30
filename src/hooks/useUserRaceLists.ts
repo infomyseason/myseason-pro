@@ -100,7 +100,6 @@ export function useUserRaceLists(): UserRaceLists & {
       }
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- prevent previous account's season data from leaking during reload
     setListsState(defaultUserRaceLists())
     void fetchSeasonRow(userId).then((next) => {
       if (!cancelled) setListsState(next)

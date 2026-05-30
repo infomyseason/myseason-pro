@@ -93,7 +93,6 @@ export function usePersistedProfile(): {
     }
 
     const fallbackProfile = freshProfileForAuthUser(authDisplayName)
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- prevent previous account's profile from leaking during reload
     setProfileState(fallbackProfile)
     void supabase
       .from("profiles")
