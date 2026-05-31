@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { SportKey } from "../components/sportTokens"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
@@ -80,13 +80,17 @@ export function usePersistedProfile(): {
   const authDisplayName = user?.displayName ?? ""
 
   const [profile, setProfileState] = useState<LocalProfile>(GUEST_PROFILE)
+  const requestSeq = useRef(0)
 
   const reload = useCallback(async () => {
+    const seq = ++requestSeq.current
     if (!userId) {
       setProfileState(GUEST_PROFILE)
       return
     }
+    setProfileState(freshProfileForAuthUser(authDisplayName))
     const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle()
+    if (seq !== requestSeq.current) return
     if (error || !data) {
       setProfileState(freshProfileForAuthUser(authDisplayName))
       return
@@ -102,6 +106,7 @@ export function usePersistedProfile(): {
   const setProfile = useCallback(
     async (next: LocalProfile) => {
       if (!userId) return false
+      const seq = ++requestSeq.current
       const patch = {
         display_name: next.displayName.trim(),
         avatar_url: next.avatarUrl.trim(),
@@ -115,6 +120,7 @@ export function usePersistedProfile(): {
         console.error(error)
         return false
       }
+      if (seq !== requestSeq.current) return false
       setProfileState(next)
       await refreshProfile()
       return true

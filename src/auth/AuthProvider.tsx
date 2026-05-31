@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { Session } from "@supabase/supabase-js"
 import type { AppUser, AuthContextValue, ProfileRow } from "./context"
 import { AuthContext } from "./context"
@@ -32,15 +32,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profileRow, setProfileRow] = useState<ProfileRow | null>(null)
   const [loading, setLoading] = useState(true)
+  const authRequestSeq = useRef(0)
+  const activeUserIdRef = useRef<string | null>(null)
 
   const refreshProfile = useCallback(async () => {
+    const seq = ++authRequestSeq.current
     const { data: ures } = await supabase.auth.getUser()
+    if (seq !== authRequestSeq.current) return
     const uid = ures.user?.id
     if (!uid) {
-      setProfileRow(null)
+      if (activeUserIdRef.current === null) setProfileRow(null)
       return
     }
+    if (activeUserIdRef.current !== uid) return
     const p = await fetchProfile(uid)
+    if (seq !== authRequestSeq.current || activeUserIdRef.current !== uid) return
     setProfileRow(p)
   }, [])
 
@@ -49,14 +55,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const hydrate = async (sess: Session | null) => {
       if (!alive) return
+      const seq = ++authRequestSeq.current
+      const uid = sess?.user?.id ?? null
+      activeUserIdRef.current = uid
       setSession(sess ?? null)
-      if (sess?.user?.id) {
-        const p = await fetchProfile(sess.user.id)
-        if (!alive) return
+      if (uid) {
+        const p = await fetchProfile(uid)
+        if (!alive || seq !== authRequestSeq.current || activeUserIdRef.current !== uid) return
         setProfileRow(p)
       } else {
         setProfileRow(null)
       }
+      if (seq !== authRequestSeq.current) return
       setLoading(false)
     }
 
