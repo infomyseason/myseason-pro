@@ -54,6 +54,7 @@ export function RaceDetailPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close a stale route modal when navigating between race ids
     setRouteMapOpen(false)
   }, [raceId])
 
