@@ -54,6 +54,7 @@ export function RaceDetailPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close a stale route modal when navigating between race ids
     setRouteMapOpen(false)
   }, [raceId])
 
@@ -70,6 +71,8 @@ export function RaceDetailPage() {
       document.body.style.overflow = prevOverflow
     }
   }, [routeMapOpen])
+
+  const distanceOptions = useMemo(() => (race ? planningDistanceOptions(race) : []), [race])
 
   if (!race) {
     return (
@@ -118,7 +121,6 @@ export function RaceDetailPage() {
   const savedToFavourites = isFavourite(race.id)
   const existingPlan = calendarEntries.find((e) => e.raceId === race.id) ?? null
   const inCalendar = Boolean(existingPlan)
-  const distanceOptions = useMemo(() => planningDistanceOptions(race), [race])
   const registrationLabel =
     race.registrationStatus === "open"
       ? "Open for registration"

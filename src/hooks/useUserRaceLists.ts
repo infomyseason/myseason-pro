@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
 
@@ -54,9 +54,26 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
   return out
 }
 
+function mergeUniqueIds(primary: string[], fallback: string[]): string[] {
+  return [...new Set([...primary, ...fallback])]
+}
+
+function mergeCalendarEntries(primary: CalendarEntry[], fallback: CalendarEntry[]): CalendarEntry[] {
+  const seen = new Set(primary.map((entry) => entry.raceId))
+  return [...primary, ...fallback.filter((entry) => !seen.has(entry.raceId))]
+}
+
+function mergeWithExistingLists(next: UserRaceLists, existing: UserRaceLists): UserRaceLists {
+  return {
+    plannedRaceIds: mergeUniqueIds(next.plannedRaceIds, existing.plannedRaceIds),
+    completedRaceIds: mergeUniqueIds(next.completedRaceIds, existing.completedRaceIds),
+    calendarEntries: mergeCalendarEntries(next.calendarEntries, existing.calendarEntries),
+  }
+}
+
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
   const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const calendarEntries = readCalendarEntries(row.calendar_entries ?? row.calendarEntries)
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,16 +83,25 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(row.planned_race_ids ?? row.plannedRaceIds),
+    completedRaceIds: readIdArray(row.completed_race_ids ?? row.completedRaceIds),
     calendarEntries: mergedEntries,
   }
 }
 
-async function fetchSeasonRow(userId: string): Promise<UserRaceLists> {
+type SeasonFetchResult = {
+  lists: UserRaceLists
+  ready: boolean
+}
+
+async function fetchSeasonRow(userId: string): Promise<SeasonFetchResult> {
   const { data, error } = await supabase.from("user_season_data").select("*").eq("user_id", userId).maybeSingle()
-  if (error || !data) return defaultUserRaceLists()
-  return listsFromRow(data as Record<string, unknown>)
+  if (error) {
+    console.error(error)
+    return { lists: defaultUserRaceLists(), ready: false }
+  }
+  if (!data) return { lists: defaultUserRaceLists(), ready: true }
+  return { lists: listsFromRow(data as Record<string, unknown>), ready: true }
 }
 
 export function useUserRaceLists(): UserRaceLists & {
@@ -88,14 +114,22 @@ export function useUserRaceLists(): UserRaceLists & {
   const userId = user?.id ?? null
 
   const [lists, setListsState] = useState<UserRaceLists>(defaultUserRaceLists())
+  const requestSeq = useRef(0)
+  const hydratedUserRef = useRef<string | null>(null)
 
   const reload = useCallback(async () => {
+    const seq = ++requestSeq.current
     if (!userId) {
+      hydratedUserRef.current = null
       setListsState(defaultUserRaceLists())
       return
     }
-    const next = await fetchSeasonRow(userId)
-    setListsState(next)
+    hydratedUserRef.current = null
+    setListsState(defaultUserRaceLists())
+    const result = await fetchSeasonRow(userId)
+    if (seq !== requestSeq.current || !result.ready) return
+    hydratedUserRef.current = userId
+    setListsState(result.lists)
   }, [userId])
 
   useEffect(() => {
@@ -106,19 +140,28 @@ export function useUserRaceLists(): UserRaceLists & {
   const setLists = useCallback(
     async (next: UserRaceLists) => {
       if (!userId) return
+      const seq = ++requestSeq.current
+      let nextToPersist = next
+      if (hydratedUserRef.current !== userId) {
+        const result = await fetchSeasonRow(userId)
+        if (seq !== requestSeq.current || !result.ready) return
+        nextToPersist = mergeWithExistingLists(next, result.lists)
+      }
       const payload = {
         user_id: userId,
-        planned_race_ids: next.plannedRaceIds,
-        completed_race_ids: next.completedRaceIds,
-        calendar_entries: next.calendarEntries,
+        planned_race_ids: nextToPersist.plannedRaceIds,
+        completed_race_ids: nextToPersist.completedRaceIds,
+        calendar_entries: nextToPersist.calendarEntries,
         updated_at: new Date().toISOString(),
       }
       const { error } = await supabase.from("user_season_data").upsert(payload, { onConflict: "user_id" })
+      if (seq !== requestSeq.current) return
       if (error) {
         console.error(error)
         return
       }
-      setListsState(next)
+      hydratedUserRef.current = userId
+      setListsState(nextToPersist)
     },
     [userId],
   )
