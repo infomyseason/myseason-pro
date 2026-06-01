@@ -56,6 +56,7 @@ export function RaceDetailPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close any open map modal when navigating to another race
     setRouteMapOpen(false)
   }, [raceId])
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "../auth/useAuth"
 import { supabase } from "../lib/supabase"
 
@@ -112,20 +112,19 @@ export function useUserRaceLists(): UserRaceLists & {
 
   const [lists, setListsState] = useState<UserRaceLists>(defaultUserRaceLists())
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null)
+  const mutationVersionRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
+    const startedAtMutationVersion = mutationVersionRef.current
     if (!userId) {
-      setListsState(defaultUserRaceLists())
-      setHydratedUserId(null)
       return () => {
         cancelled = true
       }
     }
 
-    setHydratedUserId(null)
     void fetchSeasonRow(userId).then((next) => {
-      if (cancelled) return
+      if (cancelled || startedAtMutationVersion !== mutationVersionRef.current) return
       setListsState(next)
       setHydratedUserId(userId)
     })
@@ -138,6 +137,8 @@ export function useUserRaceLists(): UserRaceLists & {
   const setLists = useCallback(
     async (next: UserRaceLists) => {
       if (!userId) return
+      const mutationVersion = mutationVersionRef.current + 1
+      mutationVersionRef.current = mutationVersion
       const nextToSave = hydratedUserId === userId ? next : mergeBeforeHydration(await fetchSeasonRow(userId), next)
       const payload = {
         user_id: userId,
@@ -151,17 +152,20 @@ export function useUserRaceLists(): UserRaceLists & {
         console.error(error)
         return
       }
+      if (mutationVersion !== mutationVersionRef.current) return
       setListsState(nextToSave)
       setHydratedUserId(userId)
     },
     [userId, hydratedUserId],
   )
 
+  const visibleLists = userId && hydratedUserId === userId ? lists : defaultUserRaceLists()
+
   return {
-    ...lists,
-    plannedCount: lists.plannedRaceIds.length,
-    completedCount: lists.completedRaceIds.length,
-    calendarCount: lists.calendarEntries.length,
+    ...visibleLists,
+    plannedCount: visibleLists.plannedRaceIds.length,
+    completedCount: visibleLists.completedRaceIds.length,
+    calendarCount: visibleLists.calendarEntries.length,
     setLists,
   }
 }
