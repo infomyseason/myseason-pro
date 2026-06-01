@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { computeDaysUntilRace, getRaceDetailById, getSubmittedRaceDetailById } from "../../data"
+import { computeDaysUntilRace, getRaceDetailById, getRaceDetailByIdIncludingPast, getSubmittedRaceDetailById } from "../../data"
 import { useFavouriteRaceIds } from "../../hooks/useFavouriteRaceIds"
 import { useRequireLoginAction } from "../../hooks/useRequireLoginAction"
 import { useUserRaceLists, type CalendarEntry } from "../../hooks/useUserRaceLists"
@@ -41,7 +41,9 @@ function HeartIcon({ filled }: { filled: boolean }) {
 export function RaceDetailPage() {
   const navigate = useNavigate()
   const { raceId } = useParams<{ raceId: string }>()
-  const race = raceId ? getRaceDetailById(raceId) ?? getSubmittedRaceDetailById(raceId) : undefined
+  const race = raceId
+    ? getRaceDetailById(raceId) ?? getRaceDetailByIdIncludingPast(raceId) ?? getSubmittedRaceDetailById(raceId)
+    : undefined
   const [routeMapOpen, setRouteMapOpen] = useState(false)
   const { toggle, isFavourite } = useFavouriteRaceIds()
   const { calendarEntries, setLists, plannedRaceIds, completedRaceIds } = useUserRaceLists()
@@ -70,6 +72,8 @@ export function RaceDetailPage() {
       document.body.style.overflow = prevOverflow
     }
   }, [routeMapOpen])
+
+  const distanceOptions = useMemo(() => (race ? planningDistanceOptions(race) : []), [race])
 
   if (!race) {
     return (
@@ -118,7 +122,6 @@ export function RaceDetailPage() {
   const savedToFavourites = isFavourite(race.id)
   const existingPlan = calendarEntries.find((e) => e.raceId === race.id) ?? null
   const inCalendar = Boolean(existingPlan)
-  const distanceOptions = useMemo(() => planningDistanceOptions(race), [race])
   const registrationLabel =
     race.registrationStatus === "open"
       ? "Open for registration"

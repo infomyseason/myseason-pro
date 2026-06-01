@@ -55,8 +55,8 @@ function readCalendarEntries(v: unknown): CalendarEntry[] {
 }
 
 function listsFromRow(row: Record<string, unknown>): UserRaceLists {
-  const legacyCalendarIds = readIdArray(row.calendarRaceIds)
-  const calendarEntries = readCalendarEntries(row.calendarEntries)
+  const legacyCalendarIds = readIdArray(row.calendar_race_ids ?? row.calendarRaceIds)
+  const calendarEntries = readCalendarEntries(row.calendar_entries ?? row.calendarEntries)
   const mergedEntries =
     calendarEntries.length > 0
       ? calendarEntries
@@ -66,9 +66,32 @@ function listsFromRow(row: Record<string, unknown>): UserRaceLists {
           addedAt: new Date().toISOString(),
         }))
   return {
-    plannedRaceIds: readIdArray(row.plannedRaceIds),
-    completedRaceIds: readIdArray(row.completedRaceIds),
+    plannedRaceIds: readIdArray(row.planned_race_ids ?? row.plannedRaceIds),
+    completedRaceIds: readIdArray(row.completed_race_ids ?? row.completedRaceIds),
     calendarEntries: mergedEntries,
+  }
+}
+
+function mergeIds(existing: string[], incoming: string[]): string[] {
+  return [...new Set([...incoming, ...existing])]
+}
+
+function mergeCalendarEntries(existing: CalendarEntry[], incoming: CalendarEntry[]): CalendarEntry[] {
+  const seen = new Set<string>()
+  const merged: CalendarEntry[] = []
+  for (const entry of [...incoming, ...existing]) {
+    if (seen.has(entry.raceId)) continue
+    seen.add(entry.raceId)
+    merged.push(entry)
+  }
+  return merged
+}
+
+function mergeBeforeHydration(existing: UserRaceLists, incoming: UserRaceLists): UserRaceLists {
+  return {
+    plannedRaceIds: mergeIds(existing.plannedRaceIds, incoming.plannedRaceIds),
+    completedRaceIds: mergeIds(existing.completedRaceIds, incoming.completedRaceIds),
+    calendarEntries: mergeCalendarEntries(existing.calendarEntries, incoming.calendarEntries),
   }
 }
 
@@ -88,29 +111,39 @@ export function useUserRaceLists(): UserRaceLists & {
   const userId = user?.id ?? null
 
   const [lists, setListsState] = useState<UserRaceLists>(defaultUserRaceLists())
-
-  const reload = useCallback(async () => {
-    if (!userId) {
-      setListsState(defaultUserRaceLists())
-      return
-    }
-    const next = await fetchSeasonRow(userId)
-    setListsState(next)
-  }, [userId])
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch calendar lists when Supabase user id changes
-    void reload()
-  }, [reload])
+    let cancelled = false
+    if (!userId) {
+      setListsState(defaultUserRaceLists())
+      setHydratedUserId(null)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    setHydratedUserId(null)
+    void fetchSeasonRow(userId).then((next) => {
+      if (cancelled) return
+      setListsState(next)
+      setHydratedUserId(userId)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const setLists = useCallback(
     async (next: UserRaceLists) => {
       if (!userId) return
+      const nextToSave = hydratedUserId === userId ? next : mergeBeforeHydration(await fetchSeasonRow(userId), next)
       const payload = {
         user_id: userId,
-        planned_race_ids: next.plannedRaceIds,
-        completed_race_ids: next.completedRaceIds,
-        calendar_entries: next.calendarEntries,
+        planned_race_ids: nextToSave.plannedRaceIds,
+        completed_race_ids: nextToSave.completedRaceIds,
+        calendar_entries: nextToSave.calendarEntries,
         updated_at: new Date().toISOString(),
       }
       const { error } = await supabase.from("user_season_data").upsert(payload, { onConflict: "user_id" })
@@ -118,9 +151,10 @@ export function useUserRaceLists(): UserRaceLists & {
         console.error(error)
         return
       }
-      setListsState(next)
+      setListsState(nextToSave)
+      setHydratedUserId(userId)
     },
-    [userId],
+    [userId, hydratedUserId],
   )
 
   return {
